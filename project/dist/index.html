@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>First Golden Horizon Bank | Institutional Wealth & Private Banking</title>
+  <meta name="description" content="First Golden Horizon Bank institutional wealth management and private banking with zero-knowledge sensitive data architecture.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Fallback standalone stylesheets and scripts for direct browser loading -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="module" crossorigin src="/assets/index-Bdn-o3sG.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-C_FeukYg.css">
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Vite module script -->
+
+  <!-- Fallback loader for direct browser preview if not served through Vite bundler -->
+  <script type="text/babel" data-type="module">
+    // Fallback detection if Vite is not running
+    setTimeout(() => {
+      const root = document.getElementById('root');
+      if (root && root.children.length === 0 && window.React && window.ReactDOM) {
+        // If root is still empty after 400ms, initialize via Babel standalone
+        console.log("Loading Apex Wealth React App via standalone loader...");
+        import('/assets/App-DQadDTGF.jsx').then(module => {
+          const App = module.default;
+          const rootNode = ReactDOM.createRoot(root);
+          rootNode.render(<App />);
+        }).catch(err => {
+          console.log("Vite or ESM module loading in progress...", err);
+        });
+      }
+    }, 400);
+  </script>
+</body>
+</html>
