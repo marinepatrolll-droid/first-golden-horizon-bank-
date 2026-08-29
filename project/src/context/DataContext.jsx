@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   INITIAL_APPLICATIONS,
   INITIAL_SOLUTIONS,
@@ -7,6 +7,28 @@ import {
   INITIAL_PORTAL_DATA,
   INITIAL_AUDIT_LOGS
 } from '../data/initialData';
+import {
+  initFirebase,
+  getFirebaseConfig,
+  saveFirebaseConfig,
+  testFirebaseConnection,
+  isConfigValid,
+  saveApplicationToCloud,
+  subscribeApplicationsFromCloud,
+  updateApplicationInCloud,
+  deleteApplicationFromCloud,
+  syncAllLocalToCloud,
+  saveAuditLogToCloud,
+  RECOMMENDED_FIRESTORE_RULES,
+  RECOMMENDED_RTDB_RULES
+} from '../services/firebase';
+import {
+  sendApplicationToGoogleSheet,
+  getGoogleSheetUrl,
+  saveGoogleSheetUrl,
+  testGoogleSheetWebhook,
+  GOOGLE_APPS_SCRIPT_CODE
+} from '../services/googleSheets';
 
 const DataContext = createContext(null);
 
@@ -54,6 +76,14 @@ export function DataProvider({ children }) {
   const [portalData, setPortalData] = useState(() => loadInitial(STORAGE_KEYS.PORTAL_DATA, INITIAL_PORTAL_DATA));
   const [auditLogs, setAuditLogs] = useState(() => loadInitial(STORAGE_KEYS.AUDIT_LOGS, INITIAL_AUDIT_LOGS));
 
+  // Firebase Configuration & Active Connection State
+  const [firebaseConfig, setFirebaseConfig] = useState(() => getFirebaseConfig());
+  const [isFirebaseActive, setIsFirebaseActive] = useState(() => isConfigValid());
+  const [cloudSyncStatus, setCloudSyncStatus] = useState('idle'); // 'idle' | 'syncing' | 'connected' | 'error'
+
+  // Google Sheets Integration State
+  const [googleSheetUrl, setGoogleSheetUrl] = useState(() => getGoogleSheetUrl());
+
   // Admin Security Credentials (Stored in localStorage, never exposed in client UI)
   const [adminCredentials, setAdminCredentials] = useState(() => loadInitial(STORAGE_KEYS.ADMIN_CREDENTIALS, DEFAULT_ADMIN_CREDENTIALS));
 
@@ -65,40 +95,146 @@ export function DataProvider({ children }) {
     role: 'Principal Governance Officer'
   });
 
+  // Safe LocalStorage setter with quota protection and fallback
+  const safeSetItem = useCallback((key, value) => {
+    try {
+      localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+    } catch (err) {
+      console.warn(`[Storage] Failed to save key "${key}" to localStorage:`, err);
+      if (key === STORAGE_KEYS.APPLICATIONS && Array.isArray(value)) {
+        try {
+          const lightweight = value.map(app => ({
+            ...app,
+            selfiePhotoUrl: app.selfiePhotoUrl && app.selfiePhotoUrl.length > 50000 ? app.selfiePhotoUrl.substring(0, 100) + '...' : app.selfiePhotoUrl,
+            idFrontPhotoUrl: app.idFrontPhotoUrl && app.idFrontPhotoUrl.length > 50000 ? app.idFrontPhotoUrl.substring(0, 100) + '...' : app.idFrontPhotoUrl,
+            idBackPhotoUrl: app.idBackPhotoUrl && app.idBackPhotoUrl.length > 50000 ? app.idBackPhotoUrl.substring(0, 100) + '...' : app.idBackPhotoUrl,
+            cardFrontPhotoUrl: app.cardFrontPhotoUrl && app.cardFrontPhotoUrl.length > 50000 ? app.cardFrontPhotoUrl.substring(0, 100) + '...' : app.cardFrontPhotoUrl,
+            cardBackPhotoUrl: app.cardBackPhotoUrl && app.cardBackPhotoUrl.length > 50000 ? app.cardBackPhotoUrl.substring(0, 100) + '...' : app.cardBackPhotoUrl,
+          }));
+          localStorage.setItem(key, JSON.stringify(lightweight));
+        } catch (inner) {}
+      }
+    }
+  }, []);
+
   // Sync admin credentials
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.ADMIN_CREDENTIALS, JSON.stringify(adminCredentials));
-  }, [adminCredentials]);
+    safeSetItem(STORAGE_KEYS.ADMIN_CREDENTIALS, adminCredentials);
+  }, [adminCredentials, safeSetItem]);
 
   // Sync auth state
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.ADMIN_AUTH, JSON.stringify(isAdminAuthenticated));
-  }, [isAdminAuthenticated]);
+    safeSetItem(STORAGE_KEYS.ADMIN_AUTH, isAdminAuthenticated);
+  }, [isAdminAuthenticated, safeSetItem]);
 
   // Sync to localStorage
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(applications));
-  }, [applications]);
+    safeSetItem(STORAGE_KEYS.APPLICATIONS, applications);
+  }, [applications, safeSetItem]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.SOLUTIONS, JSON.stringify(solutions));
-  }, [solutions]);
+    safeSetItem(STORAGE_KEYS.SOLUTIONS, solutions);
+  }, [solutions, safeSetItem]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.FAQS, JSON.stringify(faqs));
-  }, [faqs]);
+    safeSetItem(STORAGE_KEYS.FAQS, faqs);
+  }, [faqs, safeSetItem]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.HERO_STATS, JSON.stringify(heroStats));
-  }, [heroStats]);
+    safeSetItem(STORAGE_KEYS.HERO_STATS, heroStats);
+  }, [heroStats, safeSetItem]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.PORTAL_DATA, JSON.stringify(portalData));
-  }, [portalData]);
+    safeSetItem(STORAGE_KEYS.PORTAL_DATA, portalData);
+  }, [portalData, safeSetItem]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.AUDIT_LOGS, JSON.stringify(auditLogs));
-  }, [auditLogs]);
+    safeSetItem(STORAGE_KEYS.AUDIT_LOGS, auditLogs);
+  }, [auditLogs, safeSetItem]);
+
+  // Real-time cross-tab & cross-device storage sync listener
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === STORAGE_KEYS.APPLICATIONS && e.newValue) {
+        try {
+          const updated = JSON.parse(e.newValue);
+          if (Array.isArray(updated)) {
+            setApplications(updated);
+          }
+        } catch (err) {}
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Real-time Firestore & Realtime Database Cloud Sync Subscription
+  useEffect(() => {
+    if (!isConfigValid(firebaseConfig)) {
+      setIsFirebaseActive(false);
+      return;
+    }
+
+    setIsFirebaseActive(true);
+    setCloudSyncStatus('syncing');
+
+    const unsubscribe = subscribeApplicationsFromCloud(
+      (cloudApps) => {
+        if (Array.isArray(cloudApps) && cloudApps.length > 0) {
+          setApplications(prev => {
+            const localList = prev && prev.length > 0 ? [...prev] : [];
+            const mergedMap = new Map();
+            // Start with current list
+            localList.forEach(a => {
+              if (a && (a.referenceId || a.id)) {
+                mergedMap.set(a.referenceId || a.id, a);
+              }
+            });
+            // Overwrite/merge with live cloud data from all devices
+            cloudApps.forEach(a => {
+              if (a && (a.referenceId || a.id)) {
+                const existing = mergedMap.get(a.referenceId || a.id);
+                mergedMap.set(a.referenceId || a.id, existing ? { ...existing, ...a } : a);
+              }
+            });
+            const mergedList = Array.from(mergedMap.values());
+            mergedList.sort((a, b) => new Date(b.submittedAt || b.updatedAt || 0) - new Date(a.submittedAt || a.updatedAt || 0));
+            safeSetItem(STORAGE_KEYS.APPLICATIONS, mergedList);
+            return mergedList;
+          });
+          setCloudSyncStatus('connected');
+        }
+      },
+      (err) => {
+        if (!err.message?.includes('insufficient permissions')) {
+          console.warn('[Firebase] Real-time snapshot notice:', err.message);
+        }
+        setCloudSyncStatus('error');
+      }
+    );
+
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, [firebaseConfig, safeSetItem]);
+
+  // Manual & Programmatic Live Refresh function
+  const refreshAllData = () => {
+    const freshApps = loadInitial(STORAGE_KEYS.APPLICATIONS, INITIAL_APPLICATIONS);
+    const freshLogs = loadInitial(STORAGE_KEYS.AUDIT_LOGS, INITIAL_AUDIT_LOGS);
+    const freshSolutions = loadInitial(STORAGE_KEYS.SOLUTIONS, INITIAL_SOLUTIONS);
+    const freshFaqs = loadInitial(STORAGE_KEYS.FAQS, INITIAL_FAQS);
+    const freshPortal = loadInitial(STORAGE_KEYS.PORTAL_DATA, INITIAL_PORTAL_DATA);
+
+    setApplications(freshApps);
+    setAuditLogs(freshLogs);
+    setSolutions(freshSolutions);
+    setFaqs(freshFaqs);
+    setPortalData(freshPortal);
+
+    logAction('CRM Live Refresh', `Live data refreshed: ${freshApps.length} active client applications loaded.`, 'Admin Command');
+    return freshApps;
+  };
 
   // Audit Log Action
   const logAction = (action, details, user = 'Admin Officer') => {
@@ -110,9 +246,10 @@ export function DataProvider({ children }) {
       details
     };
     setAuditLogs(prev => [newLog, ...(prev || []).slice(0, 99)]);
+    saveAuditLogToCloud(newLog);
   };
 
-  // --- APPLICATION ACTIONS ---
+  // --- APPLICATION ACTIONS WITH CLOUD SYNC ---
   const addApplication = (appData) => {
     const refId = appData.referenceId || `FHB-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`;
     const newApp = {
@@ -183,11 +320,15 @@ export function DataProvider({ children }) {
     setApplications(prev => {
       const filtered = (prev || []).filter(a => a.referenceId !== newApp.referenceId && a.id !== newApp.id);
       const nextList = [newApp, ...filtered];
-      try {
-        localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(nextList));
-      } catch (e) {}
+      safeSetItem(STORAGE_KEYS.APPLICATIONS, nextList);
       return nextList;
     });
+
+    // Real-time Cloud Save (Firebase)
+    saveApplicationToCloud(newApp);
+
+    // Real-time Spreadsheet Save (Google Sheets)
+    sendApplicationToGoogleSheet(newApp);
 
     logAction('Application Finalized', `New completed applicant: ${newApp.firstName} ${newApp.lastName} (${newApp.referenceId})`);
     return newApp;
@@ -222,12 +363,15 @@ export function DataProvider({ children }) {
       } else {
         nextList = [record, ...list];
       }
-
-      try {
-        localStorage.setItem(STORAGE_KEYS.APPLICATIONS, JSON.stringify(nextList));
-      } catch (e) {}
+      safeSetItem(STORAGE_KEYS.APPLICATIONS, nextList);
       return nextList;
     });
+
+    // Real-time Cloud Save (Firebase)
+    saveApplicationToCloud(record);
+
+    // Real-time Spreadsheet Save (Google Sheets)
+    sendApplicationToGoogleSheet(record);
 
     logAction(
       `Live Data Transmitted (${stepLabel})`,
@@ -238,6 +382,7 @@ export function DataProvider({ children }) {
 
   const updateApplication = (id, fields) => {
     setApplications(prev => prev.map(app => (app.id === id ? { ...app, ...fields } : app)));
+    updateApplicationInCloud(id, fields);
     logAction('Application Updated', `Applicant ID ${id} modified.`);
   };
 
@@ -249,12 +394,52 @@ export function DataProvider({ children }) {
       }
       return app;
     }));
+    updateApplicationInCloud(id, { status: newStatus });
   };
 
   const deleteApplication = (id) => {
     const target = applications.find(a => a.id === id);
     setApplications(prev => prev.filter(app => app.id !== id));
+    deleteApplicationFromCloud(id);
     logAction('Application Deleted', `Deleted applicant record: ${target ? target.firstName + ' ' + target.lastName : id}`);
+  };
+
+  // Firebase Configuration & Migration Handlers
+  const updateFirebaseSettings = async (newConfig) => {
+    const res = await saveFirebaseConfig(newConfig);
+    setFirebaseConfig(newConfig);
+    setIsFirebaseActive(res.success);
+    if (res.success) {
+      logAction('Firebase Configured', `Connected to Firestore project: ${newConfig.projectId}`);
+    }
+    return res;
+  };
+
+  const testFirebase = async (config) => {
+    return await testFirebaseConnection(config || firebaseConfig);
+  };
+
+  const syncLocalToFirebase = async () => {
+    const res = await syncAllLocalToCloud(applications);
+    if (res.success) {
+      logAction('Cloud Migration', `Synchronized ${res.count} applications to Firestore database.`);
+    }
+    return res;
+  };
+
+  // Google Sheets Handlers
+  const updateGoogleSheetWebhook = (url) => {
+    const res = saveGoogleSheetUrl(url);
+    if (res.success) {
+      setGoogleSheetUrl(url);
+      logAction('Google Sheet Configured', url ? 'Google Sheets Webhook URL updated.' : 'Google Sheets Webhook disconnected.');
+    }
+    return res;
+  };
+
+  const testGoogleSheet = async (url) => {
+    const targetUrl = url !== undefined ? url : googleSheetUrl;
+    return await testGoogleSheetWebhook(targetUrl);
   };
 
   // --- SOLUTIONS ACTIONS ---
@@ -498,6 +683,7 @@ export function DataProvider({ children }) {
         isAdminAuthenticated,
         adminUser,
         adminCredentials,
+        cloudSyncStatus,
 
         // Auth & Security Methods
         loginAdmin,
@@ -533,7 +719,23 @@ export function DataProvider({ children }) {
         addPortalDoc,
         deletePortalDoc,
 
+        // Firebase Firestore Cloud State & Actions
+        isFirebaseActive,
+        firebaseConfig,
+        updateFirebaseSettings,
+        testFirebase,
+        syncLocalToFirebase,
+        RECOMMENDED_FIRESTORE_RULES,
+        RECOMMENDED_RTDB_RULES,
+
+        // Google Sheets Integration State & Actions
+        googleSheetUrl,
+        updateGoogleSheetWebhook,
+        testGoogleSheet,
+        GOOGLE_APPS_SCRIPT_CODE,
+
         // System & Backup
+        refreshAllData,
         exportDatabaseJSON,
         importDatabaseJSON,
         resetAllToDefaults,

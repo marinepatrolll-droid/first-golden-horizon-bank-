@@ -1,0 +1,14 @@
+{
+  "name": "first-golden-horizon-bank",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix project run dev",
+    "build": "npm --prefix project run build",
+    "preview": "npm --prefix project run preview"
+  },
+  "dependencies": {
+    "firebase": "^12.18.0"
+  }
+}

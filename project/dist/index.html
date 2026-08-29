@@ -2,42 +2,62 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0905" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+
+  <!-- Primary SEO Meta Tags -->
   <title>First Golden Horizon Bank | Institutional Wealth & Private Banking</title>
-  <meta name="description" content="First Golden Horizon Bank institutional wealth management and private banking with zero-knowledge sensitive data architecture.">
+  <meta name="title" content="First Golden Horizon Bank | Institutional Wealth & Private Banking">
+  <meta name="description" content="First Golden Horizon Bank provides institutional wealth management, private banking, bespoke treasury optimization, and zero-knowledge sensitive data architecture.">
+  <meta name="keywords" content="First Golden Horizon Bank, private banking, wealth management, institutional custody, high yield treasury, bespoke portfolios, zero knowledge banking">
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <meta name="author" content="First Golden Horizon Bank">
+  <link rel="canonical" href="https://firstgoldenhorizonbank.vercel.app/">
+
+  <!-- Open Graph / Facebook / LinkedIn -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://firstgoldenhorizonbank.vercel.app/">
+  <meta property="og:title" content="First Golden Horizon Bank | Institutional Wealth & Private Banking">
+  <meta property="og:description" content="Institutional wealth management and private banking with zero-knowledge sensitive data architecture.">
+  <meta property="og:site_name" content="First Golden Horizon Bank">
+
+  <!-- Twitter Meta Tags -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://firstgoldenhorizonbank.vercel.app/">
+  <meta name="twitter:title" content="First Golden Horizon Bank | Institutional Wealth & Private Banking">
+  <meta name="twitter:description" content="Institutional wealth management and private banking with zero-knowledge sensitive data architecture.">
+
+  <!-- Schema.org JSON-LD Structured Data for Google Rich Results -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FinancialService",
+    "name": "First Golden Horizon Bank",
+    "url": "https://firstgoldenhorizonbank.vercel.app",
+    "description": "Institutional wealth management and private banking platform with zero-knowledge data architecture.",
+    "serviceType": [
+      "Institutional Wealth Management",
+      "Private Banking",
+      "Treasury Reserve Optimization",
+      "Asset Custody"
+    ],
+    "currenciesAccepted": "USD, EUR, GBP, CHF",
+    "openingHours": "Mo,Tu,We,Th,Fr 09:00-17:00",
+    "areaServed": "Global"
+  }
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  
-  <!-- Fallback standalone stylesheets and scripts for direct browser loading -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script type="module" crossorigin src="/assets/index-Bdn-o3sG.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-C_FeukYg.css">
+  <script type="module" crossorigin src="/assets/index-hoc2fr2v.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-B_ESfrhN.css">
 </head>
 <body>
   <div id="root"></div>
-
-  <!-- Vite module script -->
-
-  <!-- Fallback loader for direct browser preview if not served through Vite bundler -->
-  <script type="text/babel" data-type="module">
-    // Fallback detection if Vite is not running
-    setTimeout(() => {
-      const root = document.getElementById('root');
-      if (root && root.children.length === 0 && window.React && window.ReactDOM) {
-        // If root is still empty after 400ms, initialize via Babel standalone
-        console.log("Loading Apex Wealth React App via standalone loader...");
-        import('/assets/App-DQadDTGF.jsx').then(module => {
-          const App = module.default;
-          const rootNode = ReactDOM.createRoot(root);
-          rootNode.render(<App />);
-        }).catch(err => {
-          console.log("Vite or ESM module loading in progress...", err);
-        });
-      }
-    }, 400);
-  </script>
 </body>
 </html>

@@ -37,45 +37,25 @@ export default function DashboardPreview({ onStartOnboarding }) {
       <div className="portal-dashboard-mockup">
         {/* Mockup Top Header */}
         <div className="mockup-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #fef08a 0%, #fbbf24 30%, #f59e0b 65%, #b45309 100%)',
-              color: '#1c1405',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 800,
-              boxShadow: '0 4px 14px rgba(245, 158, 11, 0.4)',
-              border: '1px solid rgba(254, 240, 138, 0.6)'
-            }}>
+          <div className="mockup-user-info">
+            <div className="mockup-avatar">
               EV
             </div>
             <div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+              <div className="mockup-client-name">
                 {portalData?.clientName || 'Eleanor Vance'} • Private Portfolio
               </div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              <div className="mockup-account-num">
                 Account #{portalData?.accountNumber || 'APX-8492-7104'} • Zero Sensitive Credentials Stored
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-            <span style={{
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              padding: '0.3rem 0.75rem',
-              borderRadius: 'var(--radius-full)',
-              background: 'rgba(16, 185, 129, 0.1)',
-              color: 'var(--accent-primary)',
-              border: '1px solid rgba(16, 185, 129, 0.25)'
-            }}>
+          <div className="mockup-header-actions">
+            <span className="enclave-status-badge">
               ● Hosted Enclave Synced
             </span>
-            <button type="button" className="btn btn-primary btn-sm" onClick={onStartOnboarding}>
+            <button type="button" className="btn btn-primary btn-sm mockup-cta-btn" onClick={onStartOnboarding}>
               Open Real Account
             </button>
           </div>
@@ -101,31 +81,24 @@ export default function DashboardPreview({ onStartOnboarding }) {
         </div>
 
         {/* Tab Switcher */}
-        <div style={{
-          display: 'flex',
-          gap: '0.5rem',
-          borderBottom: '1px solid var(--border-subtle)',
-          paddingBottom: '0.75rem',
-          marginBottom: '1.5rem',
-          overflowX: 'auto'
-        }}>
+        <div className="portal-tabs-scroller">
           <button 
             type="button" 
-            className={`btn btn-sm ${selectedTab === 'allocation' ? 'btn-secondary' : 'btn-ghost'}`}
+            className={`portal-tab-btn ${selectedTab === 'allocation' ? 'active' : ''}`}
             onClick={() => setSelectedTab('allocation')}
           >
             Asset Allocation Blueprint
           </button>
           <button 
             type="button" 
-            className={`btn btn-sm ${selectedTab === 'holdings' ? 'btn-secondary' : 'btn-ghost'}`}
+            className={`portal-tab-btn ${selectedTab === 'holdings' ? 'active' : ''}`}
             onClick={() => setSelectedTab('holdings')}
           >
             Institutional Holdings ({holdings.length})
           </button>
           <button 
             type="button" 
-            className={`btn btn-sm ${selectedTab === 'vault' ? 'btn-secondary' : 'btn-ghost'}`}
+            className={`portal-tab-btn ${selectedTab === 'vault' ? 'active' : ''}`}
             onClick={() => setSelectedTab('vault')}
           >
             Paperless Document Vault ({vaultDocs.length})
@@ -134,17 +107,17 @@ export default function DashboardPreview({ onStartOnboarding }) {
 
         {/* Tab 1: Allocation */}
         {selectedTab === 'allocation' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+          <div className="allocations-grid">
             {allocations.map((item, i) => (
-              <div key={item.id || i} style={{ background: 'var(--bg-surface-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '1.25rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-secondary)' }}>{item.label}</span>
-                  <span style={{ fontSize: '0.88rem', fontWeight: 700, color: item.color || 'var(--accent-primary)' }}>{item.pct}%</span>
+              <div key={item.id || i} className="allocation-card">
+                <div className="allocation-card-top">
+                  <span className="allocation-label">{item.label}</span>
+                  <span className="allocation-pct" style={{ color: item.color || 'var(--accent-primary)' }}>{item.pct}%</span>
                 </div>
-                <div style={{ width: '100%', height: '6px', background: 'var(--bg-app)', borderRadius: '4px', overflow: 'hidden', marginBottom: '0.75rem' }}>
-                  <div style={{ width: `${item.pct}%`, height: '100%', background: item.color || 'var(--accent-primary)' }}></div>
+                <div className="allocation-track">
+                  <div className="allocation-bar" style={{ width: `${item.pct}%`, background: item.color || 'var(--accent-primary)' }}></div>
                 </div>
-                <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>{item.amount}</div>
+                <div className="allocation-amount">{item.amount}</div>
               </div>
             ))}
           </div>
@@ -152,16 +125,16 @@ export default function DashboardPreview({ onStartOnboarding }) {
 
         {/* Tab 2: Holdings */}
         {selectedTab === 'holdings' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div className="holdings-list">
             {holdings.map((holding, i) => (
-              <div key={holding.id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-surface-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '0.85rem 1.25rem' }}>
-                <div>
-                  <strong style={{ fontSize: '0.92rem', color: 'var(--text-primary)', display: 'block' }}>{holding.name}</strong>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{holding.ticker} • {holding.share}</span>
+              <div key={holding.id || i} className="holding-row">
+                <div className="holding-main-info">
+                  <strong className="holding-name">{holding.name}</strong>
+                  <span className="holding-ticker">{holding.ticker} • {holding.share}</span>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>{holding.val}</div>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', fontWeight: 600 }}>{holding.gain}</span>
+                <div className="holding-financials">
+                  <div className="holding-val">{holding.val}</div>
+                  <span className="holding-gain">{holding.gain}</span>
                 </div>
               </div>
             ))}
@@ -170,20 +143,20 @@ export default function DashboardPreview({ onStartOnboarding }) {
 
         {/* Tab 3: Vault */}
         {selectedTab === 'vault' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div className="vault-list">
             {vaultDocs.map((doc, i) => (
-              <div key={doc.id || i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-surface-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '0.85rem 1.25rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <div key={doc.id || i} className="vault-row">
+                <div className="vault-file-info">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                     <polyline points="14 2 14 8 20 8"></polyline>
                   </svg>
-                  <div>
-                    <strong style={{ fontSize: '0.9rem', color: 'var(--text-primary)', display: 'block' }}>{doc.title}</strong>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{doc.date} • {doc.size}</span>
+                  <div className="vault-text-wrap">
+                    <strong className="vault-title">{doc.title}</strong>
+                    <span className="vault-meta">{doc.date} • {doc.size}</span>
                   </div>
                 </div>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => alert(`Simulated secure download of ${doc.title}`)}>
+                <button type="button" className="btn btn-ghost btn-sm vault-download-btn" onClick={() => alert(`Simulated secure download of ${doc.title}`)}>
                   Download
                 </button>
               </div>

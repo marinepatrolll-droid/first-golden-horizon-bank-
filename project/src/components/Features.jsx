@@ -41,7 +41,7 @@ export default function Features({ onStartOnboarding }) {
   };
 
   return (
-    <section id="solutions" className="container" style={{ padding: '5rem 0' }}>
+    <section id="solutions" className="solutions-section container">
       <div className="section-header">
         <span className="section-kicker">Tailored Solutions</span>
         <h2 className="section-title">Institutional Wealth Architecture</h2>
@@ -50,62 +50,32 @@ export default function Features({ onStartOnboarding }) {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+      <div className="solutions-grid">
         {solutions && solutions.map((item, index) => (
-          <div 
-            key={item.id || index}
-            style={{
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-card)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '2rem',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              transition: 'transform var(--transition-fast), border-color var(--transition-fast)'
-            }}
-          >
+          <div key={item.id || index} className="solution-card">
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                <div style={{
-                  width: '44px',
-                  height: '44px',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'rgba(var(--accent-primary-rgb), 0.12)',
-                  color: 'var(--accent-primary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
+              <div className="solution-card-top">
+                <div className="solution-icon-box">
                   {renderIcon(item.iconType)}
                 </div>
-                <span style={{
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  color: 'var(--accent-blue)',
-                  background: 'rgba(56, 189, 248, 0.1)',
-                  padding: '0.2rem 0.65rem',
-                  borderRadius: 'var(--radius-full)'
-                }}>
+                <span className="solution-badge">
                   {item.badge}
                 </span>
               </div>
 
-              <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+              <h3 className="solution-title">
                 {item.title}
               </h3>
-              <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+              <p className="solution-desc">
                 {item.desc}
               </p>
             </div>
 
-            <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-subtle)' }}>
+            <div className="solution-card-footer">
               <button 
                 type="button" 
-                className="btn btn-ghost btn-sm"
+                className="btn btn-ghost btn-sm solution-apply-btn"
                 onClick={onStartOnboarding}
-                style={{ width: '100%' }}
               >
                 <span>Apply for Strategy</span>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

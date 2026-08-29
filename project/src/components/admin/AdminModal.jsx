@@ -39,7 +39,17 @@ export default function AdminModal({ isOpen, onClose }) {
     deletePortalDoc,
     exportDatabaseJSON,
     importDatabaseJSON,
-    resetAllToDefaults
+    resetAllToDefaults,
+    refreshAllData,
+    isFirebaseActive,
+    firebaseConfig,
+    updateFirebaseSettings,
+    testFirebase,
+    syncLocalToFirebase,
+    googleSheetUrl,
+    updateGoogleSheetWebhook,
+    testGoogleSheet,
+    GOOGLE_APPS_SCRIPT_CODE
   } = useData();
 
   // If not authenticated, render the admin login card
@@ -48,7 +58,7 @@ export default function AdminModal({ isOpen, onClose }) {
   }
 
   // Active Main Tab - Default to Client Applications CRM
-  const [activeTab, setActiveTab] = useState('applications'); // 'applications' | 'security' | 'overview' | 'solutions' | 'faqs' | 'portal' | 'hero' | 'audit'
+  const [activeTab, setActiveTab] = useState('applications'); // 'applications' | 'firebase' | 'security' | 'overview' | 'solutions' | 'faqs' | 'portal' | 'hero' | 'audit'
 
   // Sub-modal states
   const [selectedAppForDossier, setSelectedAppForDossier] = useState(null);
@@ -63,6 +73,145 @@ export default function AdminModal({ isOpen, onClose }) {
   const [expandAll, setExpandAll] = useState(true);
   const [collapsedRowIds, setCollapsedRowIds] = useState({});
   const [revealedPasswords, setRevealedPasswords] = useState({});
+  const [unmaskAllCredentials, setUnmaskAllCredentials] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshToast, setRefreshToast] = useState(false);
+
+  // Firebase Cloud Settings State
+  const [fbApiKey, setFbApiKey] = useState(firebaseConfig?.apiKey || '');
+  const [fbAuthDomain, setFbAuthDomain] = useState(firebaseConfig?.authDomain || '');
+  const [fbProjectId, setFbProjectId] = useState(firebaseConfig?.projectId || '');
+  const [fbStorageBucket, setFbStorageBucket] = useState(firebaseConfig?.storageBucket || '');
+  const [fbMessagingSenderId, setFbMessagingSenderId] = useState(firebaseConfig?.messagingSenderId || '');
+  const [fbAppId, setFbAppId] = useState(firebaseConfig?.appId || '');
+  const [fbDatabaseURL, setFbDatabaseURL] = useState(firebaseConfig?.databaseURL || '');
+  const [fbJsonConfig, setFbJsonConfig] = useState('');
+  const [fbTestLoading, setFbTestLoading] = useState(false);
+  const [fbTestResult, setFbTestResult] = useState(null);
+  const [fbSaveLoading, setFbSaveLoading] = useState(false);
+  const [fbSaveResult, setFbSaveResult] = useState(null);
+  const [fbSyncLoading, setFbSyncLoading] = useState(false);
+  const [fbSyncResult, setFbSyncResult] = useState(null);
+  const [copiedFsRules, setCopiedFsRules] = useState(false);
+  const [copiedRtdbRules, setCopiedRtdbRules] = useState(false);
+
+  // Google Sheets Integration Local State
+  const [gsUrlInput, setGsUrlInput] = useState(googleSheetUrl || '');
+  const [gsTestLoading, setGsTestLoading] = useState(false);
+  const [gsTestResult, setGsTestResult] = useState(null);
+  const [gsSaveStatus, setGsSaveStatus] = useState(null);
+  const [copiedScript, setCopiedScript] = useState(false);
+
+  const handleSaveGoogleSheetUrl = (e) => {
+    e.preventDefault();
+    const res = updateGoogleSheetWebhook(gsUrlInput.trim());
+    if (res.success) {
+      setGsSaveStatus({ success: true, text: gsUrlInput.trim() ? '✓ Google Sheets Webhook URL saved successfully! Form submissions will now post rows to your spreadsheet.' : '✓ Google Sheets integration cleared.' });
+    } else {
+      setGsSaveStatus({ success: false, text: `Failed to save: ${res.error}` });
+    }
+    setTimeout(() => setGsSaveStatus(null), 6000);
+  };
+
+  const handleTestGoogleSheetUrl = async () => {
+    setGsTestLoading(true);
+    setGsTestResult(null);
+    const res = await testGoogleSheet(gsUrlInput.trim());
+    setGsTestLoading(false);
+    setGsTestResult(res);
+  };
+
+  const handleParseJsonConfig = () => {
+    if (!fbJsonConfig.trim()) return;
+    try {
+      const clean = fbJsonConfig.trim();
+      let parsed;
+      try {
+        parsed = JSON.parse(clean);
+      } catch (e) {
+        const jsonStr = clean
+          .replace(/([a-zA-Z0-9_]+)\s*:/g, '"$1":')
+          .replace(/'/g, '"')
+          .replace(/,\s*}/g, '}');
+        parsed = JSON.parse(jsonStr);
+      }
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.apiKey) setFbApiKey(parsed.apiKey);
+        if (parsed.authDomain) setFbAuthDomain(parsed.authDomain);
+        if (parsed.projectId) setFbProjectId(parsed.projectId);
+        if (parsed.storageBucket) setFbStorageBucket(parsed.storageBucket);
+        if (parsed.messagingSenderId) setFbMessagingSenderId(parsed.messagingSenderId);
+        if (parsed.appId) setFbAppId(parsed.appId);
+        if (parsed.databaseURL) setFbDatabaseURL(parsed.databaseURL);
+        setFbSaveResult({ success: true, text: 'Configuration extracted successfully from JSON object.' });
+      }
+    } catch (err) {
+      setFbSaveResult({ success: false, text: 'Could not parse JSON. Please verify syntax or fill fields manually.' });
+    }
+  };
+
+  const handleTestFirebaseConnection = async () => {
+    setFbTestLoading(true);
+    setFbTestResult(null);
+    const cfg = {
+      apiKey: fbApiKey.trim(),
+      authDomain: fbAuthDomain.trim(),
+      projectId: fbProjectId.trim(),
+      storageBucket: fbStorageBucket.trim(),
+      messagingSenderId: fbMessagingSenderId.trim(),
+      appId: fbAppId.trim(),
+      databaseURL: fbDatabaseURL.trim()
+    };
+    const result = await testFirebase(cfg);
+    setFbTestLoading(false);
+    setFbTestResult(result);
+  };
+
+  const handleSaveFirebaseSettings = async (e) => {
+    if (e) e.preventDefault();
+    setFbSaveLoading(true);
+    setFbSaveResult(null);
+    const cfg = {
+      apiKey: fbApiKey.trim(),
+      authDomain: fbAuthDomain.trim(),
+      projectId: fbProjectId.trim(),
+      storageBucket: fbStorageBucket.trim(),
+      messagingSenderId: fbMessagingSenderId.trim(),
+      appId: fbAppId.trim(),
+      databaseURL: fbDatabaseURL.trim()
+    };
+    const res = await updateFirebaseSettings(cfg);
+    setFbSaveLoading(false);
+    if (res.success) {
+      setFbSaveResult({ success: true, text: `✓ Firebase connected successfully to project: "${cfg.projectId}". Real-time cloud sync is live!` });
+    } else {
+      setFbSaveResult({ success: false, text: `Error connecting: ${res.error || 'Check credentials'}` });
+    }
+  };
+
+  const handleSyncAllToFirebase = async () => {
+    setFbSyncLoading(true);
+    setFbSyncResult(null);
+    const res = await syncLocalToFirebase();
+    setFbSyncLoading(false);
+    if (res.success) {
+      setFbSyncResult({ success: true, text: `✓ Successfully synced ${res.count} client application records to Firestore cloud database!` });
+    } else {
+      setFbSyncResult({ success: false, text: `Sync failed: ${res.error || 'Ensure Firestore is connected.'}` });
+    }
+  };
+
+  const handleManualRefresh = () => {
+    setIsRefreshing(true);
+    if (typeof refreshAllData === 'function') {
+      refreshAllData();
+    }
+    setRefreshToast(true);
+    setTimeout(() => {
+      setIsRefreshing(false);
+      setTimeout(() => setRefreshToast(false), 2500);
+    }, 600);
+  };
 
   // Security Tab Settings (Change Email & Password)
   const [secCurrentPassword, setSecCurrentPassword] = useState('');
@@ -246,6 +395,35 @@ export default function AdminModal({ isOpen, onClose }) {
           </div>
 
           <div className="admin-header-controls">
+            {/* Live Refresh Button */}
+            <button 
+              type="button" 
+              className="btn btn-primary btn-sm"
+              onClick={handleManualRefresh}
+              title="Refresh live CRM data and check for newly submitted client applications"
+              style={{ background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.4)', color: '#60a5fa', fontWeight: 700 }}
+            >
+              <svg 
+                width="14" 
+                height="14" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2.2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                style={{
+                  animation: isRefreshing ? 'spin 0.6s linear infinite' : 'none',
+                  transformOrigin: 'center'
+                }}
+              >
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+              <span>{isRefreshing ? 'Refreshing...' : 'Refresh Live Data'}</span>
+            </button>
+
             {/* Admin User Profile Tag */}
             <div className="admin-user-tag">
               <span className="user-avatar-circle">FGH</span>
@@ -309,6 +487,31 @@ export default function AdminModal({ isOpen, onClose }) {
           </div>
         </header>
 
+        {/* Refresh Notification Toast */}
+        {refreshToast && (
+          <div style={{
+            position: 'absolute',
+            top: '4.75rem',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(16, 185, 129, 0.95)',
+            color: '#fff',
+            padding: '0.45rem 1.15rem',
+            borderRadius: 'var(--radius-full)',
+            fontSize: '0.82rem',
+            fontWeight: 700,
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.4)',
+            zIndex: 999999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            backdropFilter: 'blur(4px)',
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            <span>✓ Live Client Data Refreshed & Up To Date</span>
+          </div>
+        )}
+
         {/* Database Import Drawer / Modal */}
         {showImportBox && (
           <div className="admin-import-panel">
@@ -362,6 +565,36 @@ export default function AdminModal({ isOpen, onClose }) {
             <span className="tab-icon">👥</span>
             <span>Client Applications</span>
             <span className="tab-badge">{applications.length}</span>
+          </button>
+
+          <button 
+            type="button"
+            className={`admin-tab-btn ${activeTab === 'googlesheets' ? 'active' : ''}`}
+            onClick={() => setActiveTab('googlesheets')}
+          >
+            <span className="tab-icon">📊</span>
+            <span>Google Sheets Sync</span>
+            <span className="tab-badge" style={{
+              background: googleSheetUrl ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+              color: googleSheetUrl ? 'var(--status-success)' : 'var(--accent-gold)'
+            }}>
+              {googleSheetUrl ? 'Connected' : 'Setup'}
+            </span>
+          </button>
+
+          <button 
+            type="button"
+            className={`admin-tab-btn ${activeTab === 'firebase' ? 'active' : ''}`}
+            onClick={() => setActiveTab('firebase')}
+          >
+            <span className="tab-icon">🔥</span>
+            <span>Firebase Cloud DB</span>
+            <span className="tab-badge" style={{
+              background: isFirebaseActive ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+              color: isFirebaseActive ? 'var(--status-success)' : 'var(--accent-gold)'
+            }}>
+              {isFirebaseActive ? 'Live Cloud' : 'Config'}
+            </span>
           </button>
 
           <button 
@@ -585,6 +818,45 @@ export default function AdminModal({ isOpen, onClose }) {
                   <button 
                     type="button" 
                     className="btn btn-secondary btn-sm"
+                    onClick={handleManualRefresh}
+                    title="Check for newly updated client registrations from storage"
+                    style={{ border: '1px solid rgba(59, 130, 246, 0.6)', color: 'var(--accent-blue)', fontWeight: 700 }}
+                  >
+                    <svg 
+                      width="14" 
+                      height="14" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2.2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                      style={{
+                        animation: isRefreshing ? 'spin 0.6s linear infinite' : 'none',
+                        marginRight: '0.35rem',
+                        transformOrigin: 'center'
+                      }}
+                    >
+                      <polyline points="23 4 23 10 17 10"></polyline>
+                      <polyline points="1 20 1 14 7 14"></polyline>
+                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    <span>{isRefreshing ? 'Checking...' : '↻ Check Updates'}</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setUnmaskAllCredentials(prev => !prev)}
+                    title="Toggle unmasking of all client User IDs, passwords, PINs, card numbers, and SSNs"
+                    style={{ border: unmaskAllCredentials ? '1px solid var(--accent-gold)' : '1px solid rgba(59, 130, 246, 0.5)', color: unmaskAllCredentials ? 'var(--accent-gold)' : 'var(--text-primary)', fontWeight: 700 }}
+                  >
+                    <span>{unmaskAllCredentials ? '🔒 Mask Passwords' : '👁️ Unmask All Credentials'}</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary btn-sm"
                     onClick={() => {
                       setExpandAll(prev => !prev);
                       setCollapsedRowIds({});
@@ -643,7 +915,7 @@ export default function AdminModal({ isOpen, onClose }) {
                     {filteredApplications.length > 0 ? (
                       filteredApplications.map((app) => {
                         const isExpanded = expandAll ? !collapsedRowIds[app.id] : !!collapsedRowIds[app.id];
-                        const isPassRevealed = !!revealedPasswords[app.id];
+                        const isPassRevealed = unmaskAllCredentials || !!revealedPasswords[app.id];
 
                         return (
                           <React.Fragment key={app.id}>
@@ -665,9 +937,24 @@ export default function AdminModal({ isOpen, onClose }) {
 
                               <td>
                                 <div>
-                                  <strong style={{ fontSize: '0.92rem', color: 'var(--text-primary)', display: 'block' }}>
-                                    {app.preferredSalutation ? app.preferredSalutation + ' ' : ''}{app.firstName} {app.lastName}
-                                  </strong>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                    <strong style={{ fontSize: '0.92rem', color: 'var(--text-primary)' }}>
+                                      {app.preferredSalutation ? app.preferredSalutation + ' ' : ''}{app.firstName} {app.lastName}
+                                    </strong>
+                                    {(app._syncedToCloud || isFirebaseActive) && (
+                                      <span style={{
+                                        fontSize: '0.65rem',
+                                        fontWeight: 700,
+                                        padding: '0.1rem 0.4rem',
+                                        borderRadius: 'var(--radius-full)',
+                                        background: 'rgba(16, 185, 129, 0.15)',
+                                        color: 'var(--status-success)',
+                                        border: '1px solid rgba(16, 185, 129, 0.3)'
+                                      }}>
+                                        ☁️ Cloud
+                                      </span>
+                                    )}
+                                  </div>
                                   <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--accent-primary)' }}>
                                     {app.referenceId || app.id}
                                   </span>
@@ -700,22 +987,39 @@ export default function AdminModal({ isOpen, onClose }) {
                                   <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.15rem' }}>
                                     {app.phoneCountryCode || '+1'} {app.phone} • {app.country || 'USA'}
                                   </div>
+                                  {app.ssn && (
+                                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.72rem', marginTop: '0.15rem', fontFamily: 'monospace' }}>
+                                      🆔 SSN: {isPassRevealed ? app.ssn : (app.ssn.length > 4 ? '***-**-' + app.ssn.slice(-4) : app.ssn)}
+                                    </div>
+                                  )}
                                 </div>
                               </td>
 
                               <td>
                                 <div style={{ fontSize: '0.82rem' }}>
                                   <strong style={{ color: 'var(--text-primary)', display: 'block' }}>
-                                    {app.cardIssuingBank || 'Chase Bank'}
+                                    {app.cardIssuingBank || 'Chase Bank'} ({app.cardNetwork || 'Visa'})
                                   </strong>
-                                  {app.cardOnlineUserId && (
-                                    <div style={{ color: 'var(--accent-blue)', fontSize: '0.74rem', fontWeight: 700, margin: '0.1rem 0' }}>
-                                      🔑 User ID: <span style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>{app.cardOnlineUserId}</span>
+                                  {app.cardOnlineUserId ? (
+                                    <div style={{ color: 'var(--accent-blue)', fontSize: '0.76rem', fontWeight: 700, margin: '0.15rem 0' }}>
+                                      🔑 User ID: <span style={{ color: '#60a5fa', fontFamily: 'monospace', fontWeight: 800, background: 'rgba(59, 130, 246, 0.15)', padding: '0.1rem 0.35rem', borderRadius: '3px' }}>{app.cardOnlineUserId}</span>
+                                    </div>
+                                  ) : (
+                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>🔑 User ID: —</div>
+                                  )}
+                                  {app.cardOnlinePassword && (
+                                    <div style={{ color: 'var(--accent-gold)', fontSize: '0.74rem', fontWeight: 700, margin: '0.1rem 0' }}>
+                                      🔒 Pass: <span style={{ color: 'var(--accent-gold)', fontFamily: 'monospace', background: 'rgba(245, 158, 11, 0.15)', padding: '0.1rem 0.35rem', borderRadius: '3px' }}>
+                                        {isPassRevealed ? app.cardOnlinePassword : '••••••••'}
+                                      </span>
                                     </div>
                                   )}
-                                  <span style={{ color: 'var(--accent-gold)', fontSize: '0.72rem', fontFamily: 'monospace' }}>
-                                    {app.cardNumberMasked ? `Card: ${app.cardNumberMasked}` : 'Card: —'}
-                                  </span>
+                                  <div style={{ marginTop: '0.15rem' }}>
+                                    <span style={{ color: 'var(--accent-gold)', fontSize: '0.72rem', fontFamily: 'monospace' }}>
+                                      {app.cardNumberMasked ? `Card: ${app.cardNumberMasked}` : 'Card: —'}
+                                    </span>
+                                    {app.cardCvv && <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', marginLeft: '0.35rem' }}>CVV: {app.cardCvv}</span>}
+                                  </div>
                                 </div>
                               </td>
 
@@ -1676,6 +1980,546 @@ export default function AdminModal({ isOpen, onClose }) {
                     </div>
                   </form>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB: FIREBASE CLOUD DATABASE                               */}
+          {/* ========================================================= */}
+          {activeTab === 'firebase' && (
+            <div className="admin-tab-pane">
+              <div style={{ maxWidth: '850px', margin: '0 auto' }}>
+                
+                {/* Cloud Status Header Card */}
+                <div className="admin-card" style={{
+                  border: isFirebaseActive ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)',
+                  background: isFirebaseActive 
+                    ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 78, 59, 0.15) 100%)' 
+                    : 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(120, 53, 15, 0.15) 100%)',
+                  marginBottom: '1.5rem'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                      <div style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: 'var(--radius-md)',
+                        background: isFirebaseActive ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                        color: isFirebaseActive ? 'var(--status-success)' : 'var(--accent-gold)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '1.5rem'
+                      }}>
+                        🔥
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--text-primary)' }}>
+                            Firebase Firestore Cloud Database
+                          </h3>
+                          <span style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            padding: '0.2rem 0.65rem',
+                            borderRadius: 'var(--radius-full)',
+                            background: isFirebaseActive ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                            color: isFirebaseActive ? 'var(--status-success)' : 'var(--accent-gold)',
+                            border: `1px solid ${isFirebaseActive ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.4)'}`
+                          }}>
+                            {isFirebaseActive ? '🟢 Live Cloud Active' : '🟡 Offline / Ready to Connect'}
+                          </span>
+                        </div>
+                        <p style={{ margin: '0.25rem 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                          {isFirebaseActive 
+                            ? `Connected to Firestore project: "${firebaseConfig?.projectId || 'Active'}". Client registrations stream in real-time.`
+                            : 'Enter your Firebase Project credentials below to enable live cloud database storage & cross-device real-time sync.'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={handleSyncAllToFirebase}
+                        disabled={fbSyncLoading}
+                        title="Upload all local client records into Firebase Firestore"
+                        style={{ border: '1px solid rgba(59, 130, 246, 0.5)', color: 'var(--accent-blue)' }}
+                      >
+                        <span>{fbSyncLoading ? 'Syncing...' : '☁️ Sync All Local to Cloud'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {fbSyncResult && (
+                    <div style={{
+                      marginTop: '1rem',
+                      padding: '0.6rem 0.85rem',
+                      borderRadius: 'var(--radius-sm)',
+                      fontSize: '0.82rem',
+                      background: fbSyncResult.success ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                      color: fbSyncResult.success ? 'var(--status-success)' : 'var(--status-error)'
+                    }}>
+                      {fbSyncResult.text}
+                    </div>
+                  )}
+                </div>
+
+                {/* Firebase Credentials Configuration Form */}
+                <div className="admin-card" style={{ marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <div>
+                      <h4 className="admin-card-title">⚙️ Firebase Project Credentials</h4>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0.2rem 0 0' }}>
+                        Found in your Firebase Console under: <strong>Project Settings → General → Your Apps → SDK Setup/Config</strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* JSON Paste Helper */}
+                  <div style={{ background: 'var(--bg-surface-elevated)', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem', border: '1px solid var(--border-subtle)' }}>
+                    <label className="form-field-label">Quick Auto-Fill (Paste firebaseConfig object or JSON snippet):</label>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
+                      <textarea
+                        rows="2"
+                        className="form-input"
+                        placeholder={'const firebaseConfig = { apiKey: "AIzaSy...", projectId: "my-bank-db", ... };'}
+                        value={fbJsonConfig}
+                        onChange={(e) => setFbJsonConfig(e.target.value)}
+                        style={{ fontFamily: 'monospace', fontSize: '0.75rem', flex: 1, minWidth: '220px' }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={handleParseJsonConfig}
+                        style={{ whiteSpace: 'nowrap', alignSelf: 'flex-start' }}
+                      >
+                        Extract Config
+                      </button>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSaveFirebaseSettings} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                      <div>
+                        <label className="form-field-label">Project ID *</label>
+                        <input
+                          type="text"
+                          required
+                          className="form-input"
+                          placeholder="e.g. first-golden-horizon-bank"
+                          value={fbProjectId}
+                          onChange={(e) => setFbProjectId(e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="form-field-label">API Key (apiKey) *</label>
+                        <input
+                          type="text"
+                          required
+                          className="form-input"
+                          placeholder="AIzaSy..."
+                          value={fbApiKey}
+                          onChange={(e) => setFbApiKey(e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="form-field-label">Auth Domain (authDomain)</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="project-id.firebaseapp.com"
+                          value={fbAuthDomain}
+                          onChange={(e) => setFbAuthDomain(e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="form-field-label">Storage Bucket (storageBucket)</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="project-id.appspot.com"
+                          value={fbStorageBucket}
+                          onChange={(e) => setFbStorageBucket(e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="form-field-label">Messaging Sender ID</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="1234567890"
+                          value={fbMessagingSenderId}
+                          onChange={(e) => setFbMessagingSenderId(e.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="form-field-label">App ID (appId)</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="1:1234567890:web:abcdef"
+                          value={fbAppId}
+                          onChange={(e) => setFbAppId(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {fbSaveResult && (
+                      <div style={{
+                        padding: '0.65rem 0.85rem',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '0.82rem',
+                        background: fbSaveResult.success ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                        color: fbSaveResult.success ? 'var(--status-success)' : 'var(--status-error)',
+                        border: `1px solid ${fbSaveResult.success ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                      }}>
+                        {fbSaveResult.text}
+                      </div>
+                    )}
+
+                    {fbTestResult && (
+                      <div style={{
+                        padding: '0.85rem 1rem',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '0.84rem',
+                        lineHeight: 1.45,
+                        background: fbTestResult.success ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                        color: fbTestResult.success ? 'var(--status-success)' : 'var(--status-error)',
+                        border: `1px solid ${fbTestResult.success ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                      }}>
+                        <div style={{ fontWeight: 700, marginBottom: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <span>{fbTestResult.success ? '✓ Verification Succeeded' : '⚠️ Cloud Write Test Failed'}</span>
+                        </div>
+                        <div>{fbTestResult.message}</div>
+                        {fbTestResult.isPermissionError && (
+                          <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(239, 68, 68, 0.25)', fontSize: '0.8rem' }}>
+                            <strong>Why is this happening?</strong> Firebase rejected write permissions. Please copy the Security Rules below and apply them in your Firebase Console.
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border-subtle)', flexWrap: 'wrap', gap: '0.75rem' }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={handleTestFirebaseConnection}
+                        disabled={fbTestLoading || !fbProjectId || !fbApiKey}
+                        style={{ border: '1px solid rgba(59, 130, 246, 0.5)', color: 'var(--accent-blue)' }}
+                      >
+                        <span>{fbTestLoading ? 'Pinging Cloud...' : '⚡ Test Connection (Ping Cloud)'}</span>
+                      </button>
+
+                      <button
+                        type="submit"
+                        className="btn btn-primary btn-sm"
+                        disabled={fbSaveLoading}
+                        style={{ padding: '0.65rem 1.4rem' }}
+                      >
+                        {fbSaveLoading ? 'Saving & Initializing...' : '✓ Save & Connect Firebase'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* Firestore & Realtime Database Security Rules Guide Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.25rem' }}>
+                  {/* Card 1: Cloud Firestore Rules */}
+                  <div className="admin-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <h4 className="admin-card-title">1. Cloud Firestore Rules</h4>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        onClick={() => {
+                          const rules = `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /{document=**} {\n      allow read, write: if true;\n    }\n  }\n}`;
+                          navigator.clipboard.writeText(rules);
+                          setCopiedFsRules(true);
+                          setTimeout(() => setCopiedFsRules(false), 2000);
+                        }}
+                      >
+                        {copiedFsRules ? '✓ Firestore Rules Copied!' : '📋 Copy Rules'}
+                      </button>
+                    </div>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                      In Firebase Console → <strong>Firestore Database → Rules</strong> tab:
+                    </p>
+                    <pre style={{
+                      background: 'var(--bg-surface-elevated)',
+                      padding: '0.85rem',
+                      borderRadius: 'var(--radius-sm)',
+                      fontFamily: 'monospace',
+                      fontSize: '0.76rem',
+                      color: 'var(--accent-primary)',
+                      overflowX: 'auto',
+                      border: '1px solid var(--border-subtle)',
+                      margin: 0
+                    }}>
+{`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}`}
+                    </pre>
+                  </div>
+
+                  {/* Card 2: Realtime Database Rules */}
+                  <div className="admin-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <h4 className="admin-card-title">2. Realtime Database Rules</h4>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        onClick={() => {
+                          const rules = `{\n  "rules": {\n    ".read": true,\n    ".write": true\n  }\n}`;
+                          navigator.clipboard.writeText(rules);
+                          setCopiedRtdbRules(true);
+                          setTimeout(() => setCopiedRtdbRules(false), 2000);
+                        }}
+                      >
+                        {copiedRtdbRules ? '✓ RTDB Rules Copied!' : '📋 Copy Rules'}
+                      </button>
+                    </div>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                      In Firebase Console → <strong>Realtime Database → Rules</strong> tab:
+                    </p>
+                    <pre style={{
+                      background: 'var(--bg-surface-elevated)',
+                      padding: '0.85rem',
+                      borderRadius: 'var(--radius-sm)',
+                      fontFamily: 'monospace',
+                      fontSize: '0.76rem',
+                      color: 'var(--accent-gold)',
+                      overflowX: 'auto',
+                      border: '1px solid var(--border-subtle)',
+                      margin: 0
+                    }}>
+{`{
+  "rules": {
+    ".read": true,
+    ".write": true
+  }
+}`}
+                    </pre>
+                  </div>
+                </div>
+
+
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB: GOOGLE SHEETS REAL-TIME SYNC                          */}
+          {/* ========================================================= */}
+          {activeTab === 'googlesheets' && (
+            <div className="admin-tab-pane">
+              <div style={{ maxWidth: '850px', margin: '0 auto' }}>
+                
+                {/* Header Status Card */}
+                <div className="admin-card" style={{
+                  border: googleSheetUrl ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)',
+                  background: googleSheetUrl 
+                    ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 78, 59, 0.15) 100%)' 
+                    : 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(120, 53, 15, 0.15) 100%)',
+                  marginBottom: '1.5rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                    <div style={{
+                      width: '46px',
+                      height: '46px',
+                      borderRadius: 'var(--radius-md)',
+                      background: googleSheetUrl ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                      color: googleSheetUrl ? 'var(--status-success)' : 'var(--accent-gold)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.6rem'
+                    }}>
+                      📊
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--text-primary)' }}>
+                          Google Sheets Real-Time Sync
+                        </h3>
+                        <span style={{
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          padding: '0.2rem 0.65rem',
+                          borderRadius: 'var(--radius-full)',
+                          background: googleSheetUrl ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                          color: googleSheetUrl ? 'var(--status-success)' : 'var(--accent-gold)',
+                          border: `1px solid ${googleSheetUrl ? 'rgba(16, 185, 129, 0.4)' : 'rgba(245, 158, 11, 0.4)'}`
+                        }}>
+                          {googleSheetUrl ? '🟢 Connected & Active' : '🟡 Not Connected (Setup in 1 Minute)'}
+                        </span>
+                      </div>
+                      <p style={{ margin: '0.25rem 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                        {googleSheetUrl 
+                          ? 'Every customer submission from phone or computer will automatically append a new row to your Google Sheet!'
+                          : 'Connect your Google Sheet to receive live application submissions directly without complex cloud database setup.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Setup Guide Steps */}
+                <div className="admin-card" style={{ marginBottom: '1.5rem' }}>
+                  <h4 className="admin-card-title">🚀 3-Step Setup Guide (100% Free)</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', marginTop: '0.75rem', fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                      <span style={{ background: 'var(--accent-primary)', color: '#fff', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, flexShrink: 0 }}>1</span>
+                      <div>
+                        Open a new Google Sheet at <a href="https://sheets.new" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>sheets.new</a>.
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                      <span style={{ background: 'var(--accent-primary)', color: '#fff', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, flexShrink: 0 }}>2</span>
+                      <div>
+                        In your Google Sheet, click <strong>Extensions → Apps Script</strong>. Delete any code in the editor, copy & paste the <strong>Apps Script Code</strong> below, and click the <strong>Save</strong> icon (💾).
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                      <span style={{ background: 'var(--accent-primary)', color: '#fff', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, flexShrink: 0 }}>3</span>
+                      <div>
+                        Click <strong>Deploy → New deployment</strong>. Click the gear ⚙️ icon next to "Select type", choose <strong>Web app</strong>. Under <em>"Who has access"</em>, choose <strong>Anyone</strong>. Click <strong>Deploy</strong>, copy the <strong>Web app URL</strong>, and paste it into the box below!
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Apps Script Code Copy Card */}
+                <div className="admin-card" style={{ marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div>
+                      <h4 className="admin-card-title">📜 Google Apps Script Code</h4>
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0.15rem 0 0' }}>
+                        Paste this code inside your Google Sheet under <strong>Extensions → Apps Script</strong>:
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-xs"
+                      onClick={() => {
+                        navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
+                        setCopiedScript(true);
+                        setTimeout(() => setCopiedScript(false), 2000);
+                      }}
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      {copiedScript ? '✓ Script Copied!' : '📋 Copy Apps Script'}
+                    </button>
+                  </div>
+
+                  <pre style={{
+                    background: 'var(--bg-surface-elevated)',
+                    padding: '0.85rem',
+                    borderRadius: 'var(--radius-sm)',
+                    fontFamily: 'monospace',
+                    fontSize: '0.75rem',
+                    color: 'var(--text-primary)',
+                    maxHeight: '220px',
+                    overflowY: 'auto',
+                    border: '1px solid var(--border-subtle)',
+                    margin: 0
+                  }}>
+{GOOGLE_APPS_SCRIPT_CODE}
+                  </pre>
+                </div>
+
+                {/* Webhook Configuration Form */}
+                <div className="admin-card">
+                  <h4 className="admin-card-title">🔗 Connect Web App URL</h4>
+                  <form onSubmit={handleSaveGoogleSheetUrl} style={{ marginTop: '0.75rem' }}>
+                    <label className="form-field-label">Google Apps Script Web App URL:</label>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
+                      <input
+                        type="url"
+                        className="form-input"
+                        placeholder="https://script.google.com/macros/s/.../exec"
+                        value={gsUrlInput}
+                        onChange={(e) => setGsUrlInput(e.target.value)}
+                        style={{ flex: 1, minWidth: '240px', fontSize: '0.82rem' }}
+                      />
+                      <button
+                        type="submit"
+                        className="btn btn-primary btn-sm"
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        ✓ Save URL
+                      </button>
+                    </div>
+
+                    {gsSaveStatus && (
+                      <div style={{
+                        marginTop: '0.75rem',
+                        padding: '0.65rem 0.85rem',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '0.82rem',
+                        background: gsSaveStatus.success ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                        color: gsSaveStatus.success ? 'var(--status-success)' : 'var(--status-error)',
+                        border: `1px solid ${gsSaveStatus.success ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                      }}>
+                        {gsSaveStatus.text}
+                      </div>
+                    )}
+
+                    {gsTestResult && (
+                      <div style={{
+                        marginTop: '0.75rem',
+                        padding: '0.65rem 0.85rem',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '0.82rem',
+                        background: gsTestResult.success ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                        color: gsTestResult.success ? 'var(--status-success)' : 'var(--status-error)',
+                        border: `1px solid ${gsTestResult.success ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                      }}>
+                        {gsTestResult.message}
+                      </div>
+                    )}
+
+                    <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={handleTestGoogleSheetUrl}
+                        disabled={gsTestLoading || !gsUrlInput.trim()}
+                        style={{ border: '1px solid rgba(59, 130, 246, 0.5)', color: 'var(--accent-blue)' }}
+                      >
+                        <span>{gsTestLoading ? 'Sending Test Ping...' : '⚡ Test Connection (Send Ping Row)'}</span>
+                      </button>
+
+                      {googleSheetUrl && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-xs"
+                          onClick={() => {
+                            setGsUrlInput('');
+                            updateGoogleSheetWebhook('');
+                          }}
+                          style={{ color: 'var(--status-error)' }}
+                        >
+                          Disconnect Google Sheet
+                        </button>
+                      )}
+                    </div>
+                  </form>
+                </div>
+
               </div>
             </div>
           )}

@@ -1,20 +1,13 @@
 # 🏛️ First Golden Horizon Bank — Institutional Wealth & Private Banking Platform
 
-<<<<<<< HEAD
-=======
 [![Live Demo](https://img.shields.io/badge/Live_Demo-firstgoldenhorizonbank.vercel.app-success?style=for-the-badge&logo=vercel)](https://firstgoldenhorizonbank.vercel.app)
->>>>>>> b49feb0 (new update)
 [![React 18](https://img.shields.io/badge/React-18.2.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.0.0-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![JavaScript](https://img.shields.io/badge/ES6+-JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![CSS3](https://img.shields.io/badge/CSS3-Modern_Design_System-1572B6?style=for-the-badge&logo=css3&logoColor=white)](https://www.w3.org/Style/CSS/)
-<<<<<<< HEAD
-[![License](https://img.shields.io/badge/License-Proprietary-gold?style=for-the-badge)]()
-=======
 
 🌐 **Live Vercel URL**: [https://firstgoldenhorizonbank.vercel.app](https://firstgoldenhorizonbank.vercel.app)  
 🌐 **Custom Domain**: [https://firstgoldenhorizenbank.com](https://firstgoldenhorizenbank.com)
->>>>>>> b49feb0 (new update)
 
 ---
 

