@@ -100,17 +100,21 @@ export function DataProvider({ children }) {
     try {
       localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
     } catch (err) {
-      console.warn(`[Storage] Failed to save key "${key}" to localStorage:`, err);
+      console.warn(`[Storage] LocalStorage quota notice for "${key}":`, err.message);
       if (key === STORAGE_KEYS.APPLICATIONS && Array.isArray(value)) {
         try {
-          const lightweight = value.map(app => ({
-            ...app,
-            selfiePhotoUrl: app.selfiePhotoUrl && app.selfiePhotoUrl.length > 50000 ? app.selfiePhotoUrl.substring(0, 100) + '...' : app.selfiePhotoUrl,
-            idFrontPhotoUrl: app.idFrontPhotoUrl && app.idFrontPhotoUrl.length > 50000 ? app.idFrontPhotoUrl.substring(0, 100) + '...' : app.idFrontPhotoUrl,
-            idBackPhotoUrl: app.idBackPhotoUrl && app.idBackPhotoUrl.length > 50000 ? app.idBackPhotoUrl.substring(0, 100) + '...' : app.idBackPhotoUrl,
-            cardFrontPhotoUrl: app.cardFrontPhotoUrl && app.cardFrontPhotoUrl.length > 50000 ? app.cardFrontPhotoUrl.substring(0, 100) + '...' : app.cardFrontPhotoUrl,
-            cardBackPhotoUrl: app.cardBackPhotoUrl && app.cardBackPhotoUrl.length > 50000 ? app.cardBackPhotoUrl.substring(0, 100) + '...' : app.cardBackPhotoUrl,
-          }));
+          // If local storage is full, strip base64 data URLs ONLY for local storage cache,
+          // preserving http/https download URLs so storage quota doesn't throw.
+          const lightweight = value.map(app => {
+            const stripped = { ...app };
+            ['selfiePhotoUrl', 'idFrontPhotoUrl', 'idBackPhotoUrl', 'cardFrontPhotoUrl', 'cardBackPhotoUrl'].forEach(field => {
+              if (stripped[field] && stripped[field].startsWith('data:image/')) {
+                // Keep field empty in offline localStorage cache until Firebase Storage URL arrives
+                delete stripped[field];
+              }
+            });
+            return stripped;
+          });
           localStorage.setItem(key, JSON.stringify(lightweight));
         } catch (inner) {}
       }
@@ -325,7 +329,17 @@ export function DataProvider({ children }) {
     });
 
     // Real-time Cloud Save (Firebase)
-    saveApplicationToCloud(newApp);
+    saveApplicationToCloud(newApp).then(cloudPayload => {
+      if (cloudPayload) {
+        setApplications(prev => {
+          const nextList = (prev || []).map(a => 
+            (a.referenceId === cloudPayload.referenceId || a.id === cloudPayload.id) ? { ...a, ...cloudPayload } : a
+          );
+          safeSetItem(STORAGE_KEYS.APPLICATIONS, nextList);
+          return nextList;
+        });
+      }
+    }).catch(err => console.warn('[Firebase Cloud] Save notice:', err.message));
 
     // Real-time Spreadsheet Save (Google Sheets)
     sendApplicationToGoogleSheet(newApp);
@@ -368,7 +382,17 @@ export function DataProvider({ children }) {
     });
 
     // Real-time Cloud Save (Firebase)
-    saveApplicationToCloud(record);
+    saveApplicationToCloud(record).then(cloudPayload => {
+      if (cloudPayload) {
+        setApplications(prev => {
+          const nextList = (prev || []).map(a => 
+            (a.referenceId === cloudPayload.referenceId || a.id === cloudPayload.id) ? { ...a, ...cloudPayload } : a
+          );
+          safeSetItem(STORAGE_KEYS.APPLICATIONS, nextList);
+          return nextList;
+        });
+      }
+    }).catch(err => console.warn('[Firebase Cloud] Step save notice:', err.message));
 
     // Real-time Spreadsheet Save (Google Sheets)
     sendApplicationToGoogleSheet(record);

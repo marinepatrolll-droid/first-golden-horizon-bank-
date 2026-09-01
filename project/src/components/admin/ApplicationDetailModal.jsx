@@ -1,11 +1,29 @@
 import React, { useState } from 'react';
 
 export default function ApplicationDetailModal({ application, onClose, onUpdateStatus, onSaveNotes }) {
-  const [notes, setNotes] = useState(application.notes || '');
+  const [notes, setNotes] = useState(application?.notes || '');
   const [isSaved, setIsSaved] = useState(false);
   const [showCardPassword, setShowCardPassword] = useState(false);
 
   if (!application) return null;
+
+  // Helper to resolve photo URL across different potential property names & data formats
+  const resolvePhoto = (...keys) => {
+    for (const key of keys) {
+      const val = application[key];
+      if (val && typeof val === 'string' && val.trim().length > 0) {
+        if (val.endsWith('...')) continue; // Skip truncated placeholders
+        return val;
+      }
+    }
+    return null;
+  };
+
+  const selfieUrl = resolvePhoto('selfiePhotoUrl', 'selfiePhoto', 'selfieUrl', 'selfie', 'biometricSelfie');
+  const idFrontUrl = resolvePhoto('idFrontPhotoUrl', 'idFrontPhoto', 'idFrontUrl', 'idFront', 'idFrontImage');
+  const idBackUrl = resolvePhoto('idBackPhotoUrl', 'idBackPhoto', 'idBackUrl', 'idBack', 'idBackImage');
+  const cardFrontUrl = resolvePhoto('cardFrontPhotoUrl', 'cardFrontPhoto', 'cardFrontUrl', 'cardFront', 'cardFrontImage');
+  const cardBackUrl = resolvePhoto('cardBackPhotoUrl', 'cardBackPhoto', 'cardBackUrl', 'cardBack', 'cardBackImage');
 
   const handleSaveNotes = () => {
     onSaveNotes(application.id, notes);
@@ -311,10 +329,10 @@ export default function ApplicationDetailModal({ application, onClose, onUpdateS
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
                 Applicant Biometric Selfie
               </span>
-              {application.selfiePhotoUrl ? (
+              {selfieUrl ? (
                 <div>
                   <img
-                    src={application.selfiePhotoUrl}
+                    src={selfieUrl}
                     alt="Applicant Selfie"
                     style={{ width: '130px', height: '130px', objectFit: 'cover', borderRadius: '50%', border: '2px solid var(--status-success)', margin: '0 auto 0.5rem', display: 'block' }}
                   />
@@ -332,10 +350,10 @@ export default function ApplicationDetailModal({ application, onClose, onUpdateS
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
                 Front of {application.idType || "Government ID"}
               </span>
-              {application.idFrontPhotoUrl ? (
+              {idFrontUrl ? (
                 <div>
                   <img
-                    src={application.idFrontPhotoUrl}
+                    src={idFrontUrl}
                     alt="Front of Government ID"
                     style={{ width: '100%', maxHeight: '110px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', margin: '0 auto 0.5rem', display: 'block' }}
                   />
@@ -353,10 +371,10 @@ export default function ApplicationDetailModal({ application, onClose, onUpdateS
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
                 Back of {application.idType || "Government ID"}
               </span>
-              {application.idBackPhotoUrl ? (
+              {idBackUrl ? (
                 <div>
                   <img
-                    src={application.idBackPhotoUrl}
+                    src={idBackUrl}
                     alt="Back of Government ID"
                     style={{ width: '100%', maxHeight: '110px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', margin: '0 auto 0.5rem', display: 'block' }}
                   />
@@ -374,10 +392,10 @@ export default function ApplicationDetailModal({ application, onClose, onUpdateS
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
                 Front of Card ({application.cardIssuingBank || 'Issuing Bank'})
               </span>
-              {application.cardFrontPhotoUrl ? (
+              {cardFrontUrl ? (
                 <div>
                   <img
-                    src={application.cardFrontPhotoUrl}
+                    src={cardFrontUrl}
                     alt="Front of Credit Card"
                     style={{ width: '100%', maxHeight: '110px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', margin: '0 auto 0.5rem', display: 'block' }}
                   />
@@ -395,10 +413,10 @@ export default function ApplicationDetailModal({ application, onClose, onUpdateS
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
                 Back of Card (Signature Strip)
               </span>
-              {application.cardBackPhotoUrl ? (
+              {cardBackUrl ? (
                 <div>
                   <img
-                    src={application.cardBackPhotoUrl}
+                    src={cardBackUrl}
                     alt="Back of Credit Card"
                     style={{ width: '100%', maxHeight: '110px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', margin: '0 auto 0.5rem', display: 'block' }}
                   />

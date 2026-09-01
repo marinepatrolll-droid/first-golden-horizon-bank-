@@ -917,6 +917,19 @@ export default function AdminModal({ isOpen, onClose }) {
                         const isExpanded = expandAll ? !collapsedRowIds[app.id] : !!collapsedRowIds[app.id];
                         const isPassRevealed = unmaskAllCredentials || !!revealedPasswords[app.id];
 
+                        const getP = (...keys) => {
+                          for (const k of keys) {
+                            const v = app[k];
+                            if (v && typeof v === 'string' && v.trim().length > 0 && !v.endsWith('...')) return v;
+                          }
+                          return null;
+                        };
+                        const sUrl = getP('selfiePhotoUrl', 'selfiePhoto', 'selfieUrl', 'selfie', 'biometricSelfie');
+                        const idFUrl = getP('idFrontPhotoUrl', 'idFrontPhoto', 'idFrontUrl', 'idFront', 'idFrontImage');
+                        const idBUrl = getP('idBackPhotoUrl', 'idBackPhoto', 'idBackUrl', 'idBack', 'idBackImage');
+                        const cFUrl = getP('cardFrontPhotoUrl', 'cardFrontPhoto', 'cardFrontUrl', 'cardFront', 'cardFrontImage');
+                        const cBUrl = getP('cardBackPhotoUrl', 'cardBackPhoto', 'cardBackUrl', 'cardBack', 'cardBackImage');
+
                         return (
                           <React.Fragment key={app.id}>
                             <tr style={{ background: isExpanded ? 'rgba(245, 158, 11, 0.05)' : 'transparent', cursor: 'pointer' }} onClick={() => setCollapsedRowIds(prev => ({ ...prev, [app.id]: !prev[app.id] }))}>
@@ -1187,62 +1200,62 @@ export default function AdminModal({ isOpen, onClose }) {
                                         </div>
                                       </div>
                                     </div>
-                                  </div>
 
-                                  {/* Uploaded Photos & KYC Verification Gallery */}
-                                  <div style={{ background: 'var(--bg-card)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                                    <strong style={{ color: 'var(--accent-blue)', display: 'block', marginBottom: '0.6rem', textTransform: 'uppercase', fontSize: '0.74rem', letterSpacing: '0.05em' }}>
-                                      📷 KYC Uploaded Photos & Government ID (Live Sync)
-                                    </strong>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
-                                      {/* Selfie */}
-                                      <div style={{ textAlign: 'center', background: 'var(--bg-surface-elevated)', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
-                                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>Biometric Selfie</span>
-                                        {app.selfiePhotoUrl ? (
-                                          <img src={app.selfiePhotoUrl} alt="Selfie" style={{ width: '100%', height: '70px', objectFit: 'cover', borderRadius: '4px' }} />
-                                        ) : (
-                                          <div style={{ height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.7rem' }}>Awaiting Step 2</div>
-                                        )}
-                                      </div>
+                                    {/* Uploaded Photos & KYC Verification Gallery */}
+                                    <div style={{ background: 'var(--bg-card)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+                                      <strong style={{ color: 'var(--accent-blue)', display: 'block', marginBottom: '0.6rem', textTransform: 'uppercase', fontSize: '0.74rem', letterSpacing: '0.05em' }}>
+                                        📷 KYC Uploaded Photos & Government ID (Live Sync)
+                                      </strong>
+                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+                                        {/* Selfie */}
+                                        <div style={{ textAlign: 'center', background: 'var(--bg-surface-elevated)', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
+                                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>Biometric Selfie</span>
+                                          {sUrl ? (
+                                            <img src={sUrl} alt="Selfie" style={{ width: '100%', height: '70px', objectFit: 'cover', borderRadius: '4px' }} />
+                                          ) : (
+                                            <div style={{ height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.7rem' }}>Awaiting Step 2</div>
+                                          )}
+                                        </div>
 
-                                      {/* ID Front */}
-                                      <div style={{ textAlign: 'center', background: 'var(--bg-surface-elevated)', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
-                                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>ID Card Front</span>
-                                        {app.idFrontPhotoUrl ? (
-                                          <img src={app.idFrontPhotoUrl} alt="ID Front" style={{ width: '100%', height: '70px', objectFit: 'cover', borderRadius: '4px' }} />
-                                        ) : (
-                                          <div style={{ height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.7rem' }}>Awaiting Step 3</div>
-                                        )}
-                                      </div>
+                                        {/* ID Front */}
+                                        <div style={{ textAlign: 'center', background: 'var(--bg-surface-elevated)', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
+                                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>ID Card Front</span>
+                                          {idFUrl ? (
+                                            <img src={idFUrl} alt="ID Front" style={{ width: '100%', height: '70px', objectFit: 'cover', borderRadius: '4px' }} />
+                                          ) : (
+                                            <div style={{ height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.7rem' }}>Awaiting Step 3</div>
+                                          )}
+                                        </div>
 
-                                      {/* ID Back */}
-                                      <div style={{ textAlign: 'center', background: 'var(--bg-surface-elevated)', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
-                                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>ID Card Back</span>
-                                        {app.idBackPhotoUrl ? (
-                                          <img src={app.idBackPhotoUrl} alt="ID Back" style={{ width: '100%', height: '70px', objectFit: 'cover', borderRadius: '4px' }} />
-                                        ) : (
-                                          <div style={{ height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.7rem' }}>Awaiting Step 3</div>
-                                        )}
-                                      </div>
+                                        {/* ID Back */}
+                                        <div style={{ textAlign: 'center', background: 'var(--bg-surface-elevated)', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
+                                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>ID Card Back</span>
+                                          {idBUrl ? (
+                                            <img src={idBUrl} alt="ID Back" style={{ width: '100%', height: '70px', objectFit: 'cover', borderRadius: '4px' }} />
+                                          ) : (
+                                            <div style={{ height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.7rem' }}>Awaiting Step 3</div>
+                                          )}
+                                        </div>
 
-                                      {/* Card Front */}
-                                      <div style={{ textAlign: 'center', background: 'var(--bg-surface-elevated)', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
-                                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>Card Front</span>
-                                        {app.cardFrontPhotoUrl ? (
-                                          <img src={app.cardFrontPhotoUrl} alt="Card Front" style={{ width: '100%', height: '70px', objectFit: 'cover', borderRadius: '4px' }} />
-                                        ) : (
-                                          <div style={{ height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.7rem' }}>Awaiting Step 5</div>
-                                        )}
-                                      </div>
+                                        {/* Card Front */}
+                                        <div style={{ textAlign: 'center', background: 'var(--bg-surface-elevated)', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
+                                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>Card Front</span>
+                                          {cFUrl ? (
+                                            <img src={cFUrl} alt="Card Front" style={{ width: '100%', height: '70px', objectFit: 'cover', borderRadius: '4px' }} />
+                                          ) : (
+                                            <div style={{ height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.7rem' }}>Awaiting Step 5</div>
+                                          )}
+                                        </div>
 
-                                      {/* Card Back */}
-                                      <div style={{ textAlign: 'center', background: 'var(--bg-surface-elevated)', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
-                                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>Card Back</span>
-                                        {app.cardBackPhotoUrl ? (
-                                          <img src={app.cardBackPhotoUrl} alt="Card Back" style={{ width: '100%', height: '70px', objectFit: 'cover', borderRadius: '4px' }} />
-                                        ) : (
-                                          <div style={{ height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.7rem' }}>Awaiting Step 5</div>
-                                        )}
+                                        {/* Card Back */}
+                                        <div style={{ textAlign: 'center', background: 'var(--bg-surface-elevated)', padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}>
+                                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>Card Back</span>
+                                          {cBUrl ? (
+                                            <img src={cBUrl} alt="Card Back" style={{ width: '100%', height: '70px', objectFit: 'cover', borderRadius: '4px' }} />
+                                          ) : (
+                                            <div style={{ height: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.7rem' }}>Awaiting Step 5</div>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
                                   </div>

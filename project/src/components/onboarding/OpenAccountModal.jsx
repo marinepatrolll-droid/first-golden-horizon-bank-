@@ -417,7 +417,7 @@ export default function OpenAccountModal({ isOpen, onClose }) {
     if (!file) return;
 
     try {
-      const dataUrl = await compressImage(file, 800, 600, 0.72);
+      const dataUrl = await compressImage(file, 550, 420, 0.60);
       if (fieldType === 'selfie') {
         setFormData(prev => ({
           ...prev,
