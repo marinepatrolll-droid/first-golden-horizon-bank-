@@ -177,14 +177,62 @@ function fallbackCompress(file, maxWidth, maxHeight, quality, resolve) {
   }
 }
 
-// Last-resort fallback: read the original file bytes directly as a data URL.
-// Guarantees a usable preview even when canvas decoding fails (e.g. iOS HEIC).
+// Downscale an already-decoded data URL through an <img>/canvas into a small
+// JPEG. Keeps the payload small enough to store directly in the cloud
+// (Firestore has a ~1MB per-document limit) so it always reaches the admin
+// panel on any device, even when Firebase Storage upload is unavailable.
+const shrinkDataUrl = (dataUrl, maxWidth = 480, maxHeight = 360, quality = 0.45) => {
+  return new Promise((resolve) => {
+    if (!dataUrl) return resolve('');
+    try {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          let width = img.width || maxWidth;
+          let height = img.height || maxHeight;
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            return resolve(canvas.toDataURL('image/jpeg', quality));
+          }
+        } catch (err) {}
+        resolve(dataUrl);
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    } catch (err) {
+      resolve(dataUrl);
+    }
+  });
+};
+
+// Last-resort fallback: read the original file bytes, then downscale so the
+// preview always renders AND the image is small enough to sync to the cloud.
 const readFileAsDataUrl = (file) => {
   return new Promise((resolve) => {
     if (!file) return resolve('');
     try {
       const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target?.result || '');
+      reader.onload = async (e) => {
+        const raw = e.target?.result || '';
+        if (!raw) return resolve('');
+        // Always try to shrink; only fall back to raw if it stays small.
+        const shrunk = await shrinkDataUrl(raw);
+        if (shrunk) return resolve(shrunk);
+        // Cap raw payloads so we never break cloud sync with a multi-MB string.
+        resolve(raw.length > 900000 ? '' : raw);
+      };
       reader.onerror = () => resolve('');
       reader.readAsDataURL(file);
     } catch (err) {
