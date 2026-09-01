@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { photoStore } from '../../utils/photoStore';
 
 export default function ApplicationDetailModal({ application, onClose, onUpdateStatus, onSaveNotes }) {
   const [notes, setNotes] = useState(application?.notes || '');
@@ -7,7 +8,9 @@ export default function ApplicationDetailModal({ application, onClose, onUpdateS
 
   if (!application) return null;
 
-  // Helper to resolve photo URL across different potential property names & data formats
+  const appId = application.referenceId || application.id;
+
+  // Helper to resolve photo URL across different potential property names & data formats + photoStore backup
   const resolvePhoto = (...keys) => {
     for (const key of keys) {
       const val = application[key];
@@ -15,6 +18,10 @@ export default function ApplicationDetailModal({ application, onClose, onUpdateS
         if (val.endsWith('...')) continue; // Skip truncated placeholders
         return val;
       }
+    }
+    for (const key of keys) {
+      const backup = photoStore.getPhoto(appId, key);
+      if (backup) return backup;
     }
     return null;
   };

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
+import { photoStore } from '../../utils/photoStore';
 import ApplicationDetailModal from './ApplicationDetailModal';
 import EditEntityModal from './EditEntityModal';
 import AdminLogin from './AdminLogin';
@@ -921,6 +922,11 @@ export default function AdminModal({ isOpen, onClose }) {
                           for (const k of keys) {
                             const v = app[k];
                             if (v && typeof v === 'string' && v.trim().length > 0 && !v.endsWith('...')) return v;
+                          }
+                          const appId = app.referenceId || app.id;
+                          for (const k of keys) {
+                            const backup = photoStore.getPhoto(appId, k);
+                            if (backup) return backup;
                           }
                           return null;
                         };

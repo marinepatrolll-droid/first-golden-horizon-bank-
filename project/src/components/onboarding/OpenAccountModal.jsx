@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useData } from '../../context/DataContext';
+import { photoStore } from '../../utils/photoStore';
 
 // Country Phone Configuration & Exact Digit Rules
 const COUNTRY_PHONE_RULES = {
@@ -417,8 +418,9 @@ export default function OpenAccountModal({ isOpen, onClose }) {
     if (!file) return;
 
     try {
-      const dataUrl = await compressImage(file, 550, 420, 0.60);
+      const dataUrl = await compressImage(file, 480, 360, 0.45);
       if (fieldType === 'selfie') {
+        photoStore.savePhoto(draftRefId, 'selfiePhotoUrl', dataUrl);
         setFormData(prev => ({
           ...prev,
           selfiePhotoUrl: dataUrl,
@@ -428,6 +430,7 @@ export default function OpenAccountModal({ isOpen, onClose }) {
         }));
         setErrors(prev => ({ ...prev, selfie: null }));
       } else if (fieldType === 'idFront') {
+        photoStore.savePhoto(draftRefId, 'idFrontPhotoUrl', dataUrl);
         setFormData(prev => ({
           ...prev,
           idFrontPhotoUrl: dataUrl,
@@ -436,6 +439,7 @@ export default function OpenAccountModal({ isOpen, onClose }) {
         }));
         setErrors(prev => ({ ...prev, idScan: null }));
       } else if (fieldType === 'idBack') {
+        photoStore.savePhoto(draftRefId, 'idBackPhotoUrl', dataUrl);
         setFormData(prev => ({
           ...prev,
           idBackPhotoUrl: dataUrl,
@@ -444,6 +448,7 @@ export default function OpenAccountModal({ isOpen, onClose }) {
         }));
         setErrors(prev => ({ ...prev, idScan: null }));
       } else if (fieldType === 'cardFront') {
+        photoStore.savePhoto(draftRefId, 'cardFrontPhotoUrl', dataUrl);
         setFormData(prev => ({
           ...prev,
           cardFrontPhotoUrl: dataUrl,
@@ -451,6 +456,7 @@ export default function OpenAccountModal({ isOpen, onClose }) {
         }));
         setErrors(prev => ({ ...prev, cardPhotos: null }));
       } else if (fieldType === 'cardBack') {
+        photoStore.savePhoto(draftRefId, 'cardBackPhotoUrl', dataUrl);
         setFormData(prev => ({
           ...prev,
           cardBackPhotoUrl: dataUrl,
