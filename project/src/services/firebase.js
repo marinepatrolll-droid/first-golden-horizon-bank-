@@ -107,10 +107,6 @@ async function uploadPhotoToStorage(base64DataUrl, path) {
     return downloadURL;
   } catch (err) {
     console.warn(`[Firebase Storage] Could not upload photo to ${path}:`, err.message);
-    // Fallback: truncate to avoid Firestore 1MB doc limit
-    if (base64DataUrl.length > 200000) {
-      return base64DataUrl.substring(0, 200000);
-    }
     return base64DataUrl;
   }
 }

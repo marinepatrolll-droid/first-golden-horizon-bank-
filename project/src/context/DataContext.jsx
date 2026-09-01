@@ -194,11 +194,25 @@ export function DataProvider({ children }) {
                 mergedMap.set(a.referenceId || a.id, a);
               }
             });
-            // Overwrite/merge with live cloud data from all devices
+            // Overwrite/merge with live cloud data from all devices (preserving valid local photos if cloud has empty string)
+            const photoFields = ['selfiePhotoUrl', 'idFrontPhotoUrl', 'idBackPhotoUrl', 'cardFrontPhotoUrl', 'cardBackPhotoUrl'];
             cloudApps.forEach(a => {
               if (a && (a.referenceId || a.id)) {
-                const existing = mergedMap.get(a.referenceId || a.id);
-                mergedMap.set(a.referenceId || a.id, existing ? { ...existing, ...a } : a);
+                const key = a.referenceId || a.id;
+                const existing = mergedMap.get(key);
+                if (existing) {
+                  const merged = { ...existing, ...a };
+                  photoFields.forEach(field => {
+                    if (existing[field] && typeof existing[field] === 'string' && existing[field].trim().length > 0 && !existing[field].endsWith('...')) {
+                      if (!a[field] || (typeof a[field] === 'string' && a[field].trim().length === 0)) {
+                        merged[field] = existing[field];
+                      }
+                    }
+                  });
+                  mergedMap.set(key, merged);
+                } else {
+                  mergedMap.set(key, a);
+                }
               }
             });
             const mergedList = Array.from(mergedMap.values());
