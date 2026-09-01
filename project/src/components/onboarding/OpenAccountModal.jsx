@@ -103,46 +103,121 @@ const getMaxDobDate = () => {
   return d.toISOString().split('T')[0];
 };
 
-// High-performance image compression helper (optimized for mobile camera uploads and Firestore 1MB quota)
-const compressImage = (file, maxWidth = 640, maxHeight = 480, quality = 0.55) => {
-  return new Promise((resolve) => {
-    if (!file || !file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result || '');
-      reader.onerror = () => resolve('');
-      reader.readAsDataURL(file);
-      return;
-    }
+// High-performance mobile-optimized image compression helper (iOS HEIC, Android camera, and mobile Safari/Chrome compatible)
+function fallbackCompress(file, maxWidth, maxHeight, quality, resolve) {
+  let objectUrl = '';
+  try {
+    objectUrl = URL.createObjectURL(file);
+  } catch (err) {}
+
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    try {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      if (height > maxHeight) {
+        width = Math.round((width * maxHeight) / height);
+        height = maxHeight;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        return resolve(dataUrl);
+      }
+    } catch (err) {}
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    resolve('');
+  };
+  img.onerror = () => {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
     const reader = new FileReader();
     reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let { width, height } = img;
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-        if (height > maxHeight) {
-          width = Math.round((width * maxHeight) / height);
-          height = maxHeight;
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL('image/jpeg', quality);
-          resolve(dataUrl);
-        } else {
-          resolve(e.target.result);
-        }
-      };
-      img.onerror = () => resolve(e.target.result);
-      img.src = e.target.result;
+      const res = e.target.result || '';
+      if (res.length > 80000) {
+        const tempImg = new Image();
+        tempImg.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 400;
+            canvas.height = 300;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(tempImg, 0, 0, 400, 300);
+              return resolve(canvas.toDataURL('image/jpeg', 0.40));
+            }
+          } catch (err) {}
+          resolve(res);
+        };
+        tempImg.onerror = () => resolve(res);
+        tempImg.src = res;
+      } else {
+        resolve(res);
+      }
     };
     reader.onerror = () => resolve('');
     reader.readAsDataURL(file);
+  };
+  if (objectUrl) {
+    img.src = objectUrl;
+  } else {
+    const reader = new FileReader();
+    reader.onload = (e) => { img.src = e.target.result; };
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
+  }
+}
+
+const compressImage = (file, maxWidth = 480, maxHeight = 360, quality = 0.45) => {
+  return new Promise((resolve) => {
+    if (!file) return resolve('');
+
+    // Method 1: Modern high-speed native mobile decoder (iOS Safari 15+, Android Chrome, Edge)
+    if (typeof window !== 'undefined' && 'createImageBitmap' in window) {
+      createImageBitmap(file)
+        .then((bitmap) => {
+          try {
+            const canvas = document.createElement('canvas');
+            let width = bitmap.width;
+            let height = bitmap.height;
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(bitmap, 0, 0, width, height);
+              const dataUrl = canvas.toDataURL('image/jpeg', quality);
+              bitmap.close();
+              return resolve(dataUrl);
+            }
+            bitmap.close();
+          } catch (e) {
+            try { bitmap.close(); } catch (err) {}
+          }
+          fallbackCompress(file, maxWidth, maxHeight, quality, resolve);
+        })
+        .catch(() => {
+          fallbackCompress(file, maxWidth, maxHeight, quality, resolve);
+        });
+    } else {
+      fallbackCompress(file, maxWidth, maxHeight, quality, resolve);
+    }
   });
 };
 
