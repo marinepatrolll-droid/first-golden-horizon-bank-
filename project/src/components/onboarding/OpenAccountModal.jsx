@@ -177,6 +177,22 @@ function fallbackCompress(file, maxWidth, maxHeight, quality, resolve) {
   }
 }
 
+// Last-resort fallback: read the original file bytes directly as a data URL.
+// Guarantees a usable preview even when canvas decoding fails (e.g. iOS HEIC).
+const readFileAsDataUrl = (file) => {
+  return new Promise((resolve) => {
+    if (!file) return resolve('');
+    try {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result || '');
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    } catch (err) {
+      resolve('');
+    }
+  });
+};
+
 const compressImage = (file, maxWidth = 480, maxHeight = 360, quality = 0.45) => {
   return new Promise((resolve) => {
     if (!file) return resolve('');
@@ -493,7 +509,21 @@ export default function OpenAccountModal({ isOpen, onClose }) {
     if (!file) return;
 
     try {
-      const dataUrl = await compressImage(file, 480, 360, 0.45);
+      let dataUrl = await compressImage(file, 480, 360, 0.45);
+      // If canvas-based compression failed (common with iOS HEIC / some mobile
+      // camera formats), fall back to reading the original file bytes so the
+      // preview always renders instead of showing nothing.
+      if (!dataUrl) {
+        dataUrl = await readFileAsDataUrl(file);
+      }
+      // Never mark a photo as captured with an empty URL — that produced an
+      // "uploaded but nothing shows" state on mobile.
+      if (!dataUrl) {
+        console.warn('[v0] Could not read uploaded image for field:', fieldType);
+        return;
+      }
+      // Allow the input to re-fire onChange if the same file is picked again.
+      if (e.target) e.target.value = '';
       if (fieldType === 'selfie') {
         photoStore.savePhoto(draftRefId, 'selfiePhotoUrl', dataUrl);
         setFormData(prev => ({
