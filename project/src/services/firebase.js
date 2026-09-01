@@ -18,6 +18,12 @@ import {
   remove as rtdbRemove,
   onValue as rtdbOnValue
 } from 'firebase/database';
+import {
+  getStorage,
+  ref as storageRef,
+  uploadString,
+  getDownloadURL
+} from 'firebase/storage';
 
 const FIREBASE_CONFIG_STORAGE_KEY = 'fgh_firebase_config_v1';
 
@@ -53,40 +59,78 @@ export const DEFAULT_FIREBASE_CONFIG = {
 let firebaseApp = null;
 let firestoreDb = null;
 let realtimeDb = null;
+let storageInstance = null;
 let analyticsInstance = null;
 let currentConfig = null;
 
-// Clean and sanitize any JS object so Firestore never throws on `undefined` values
-// and prevent individual oversized base64 strings from hitting Firestore 1MB limits
-export function sanitizePayload(data, maxPhotoBytes = 150000) {
+// Photo field names that should be uploaded to Firebase Storage
+const PHOTO_FIELDS = [
+  'selfiePhotoUrl',
+  'idFrontPhotoUrl',
+  'idBackPhotoUrl',
+  'cardFrontPhotoUrl',
+  'cardBackPhotoUrl'
+];
+
+// Clean and sanitize any JS object so Firestore never throws on undefined values.
+// Photos are uploaded to Storage separately via uploadPhotosToStorage() - not truncated here.
+export function sanitizePayload(data) {
   if (data === null || data === undefined) return '';
   if (typeof data !== 'object') return data;
   if (Array.isArray(data)) {
-    return data.map(item => sanitizePayload(item, maxPhotoBytes));
+    return data.map(item => sanitizePayload(item));
   }
-
   const cleaned = {};
   for (const [key, value] of Object.entries(data)) {
     if (value === undefined) {
       cleaned[key] = '';
-    } else if (typeof value === 'string') {
-      // Guard against individual photo strings exceeding 150KB to keep total doc size < 500KB
-      if (key.toLowerCase().includes('photo') || key.toLowerCase().includes('url') || key.toLowerCase().includes('image')) {
-        if (value.startsWith('data:image/') && value.length > maxPhotoBytes) {
-          cleaned[key] = value.substring(0, maxPhotoBytes);
-        } else {
-          cleaned[key] = value;
-        }
-      } else {
-        cleaned[key] = value;
-      }
     } else if (value !== null && typeof value === 'object') {
-      cleaned[key] = sanitizePayload(value, maxPhotoBytes);
+      cleaned[key] = sanitizePayload(value);
     } else {
       cleaned[key] = value;
     }
   }
   return cleaned;
+}
+
+// Upload a single base64 photo to Firebase Storage and return the download URL.
+// Returns the original base64 string as fallback if Storage is unavailable.
+async function uploadPhotoToStorage(base64DataUrl, path) {
+  if (!base64DataUrl || !base64DataUrl.startsWith('data:image/')) return base64DataUrl;
+  const storage = getStorageInstance();
+  if (!storage) return base64DataUrl;
+  try {
+    const photoRef = storageRef(storage, path);
+    const contentType = base64DataUrl.split(';')[0].split(':')[1] || 'image/jpeg';
+    await uploadString(photoRef, base64DataUrl, 'data_url', { contentType });
+    const downloadURL = await getDownloadURL(photoRef);
+    return downloadURL;
+  } catch (err) {
+    console.warn(`[Firebase Storage] Could not upload photo to ${path}:`, err.message);
+    // Fallback: truncate to avoid Firestore 1MB doc limit
+    if (base64DataUrl.length > 200000) {
+      return base64DataUrl.substring(0, 200000);
+    }
+    return base64DataUrl;
+  }
+}
+
+// Upload all photo fields in an application record to Firebase Storage.
+// Returns a new record object with photo fields replaced by Storage download URLs.
+export async function uploadPhotosToStorage(appData) {
+  if (!appData) return appData;
+  const docId = appData.referenceId || appData.id;
+  if (!docId) return appData;
+  const updated = { ...appData };
+  for (const field of PHOTO_FIELDS) {
+    const val = appData[field];
+    if (val && val.startsWith('data:image/')) {
+      const ext = val.includes('image/png') ? 'png' : 'jpg';
+      const storagePath = `applications/${docId}/${field}.${ext}`;
+      updated[field] = await uploadPhotoToStorage(val, storagePath);
+    }
+  }
+  return updated;
 }
 
 // Get current saved or default configuration
@@ -110,7 +154,7 @@ export function isConfigValid(config = getFirebaseConfig()) {
   return !!(config && config.projectId && (config.apiKey || config.authDomain));
 }
 
-// Initialize Firebase App, Firestore, Realtime Database, and Analytics
+// Initialize Firebase App, Firestore, Realtime Database, Storage, and Analytics
 export function initFirebase(customConfig = null) {
   const config = customConfig || getFirebaseConfig();
   currentConfig = config;
@@ -145,6 +189,15 @@ export function initFirebase(customConfig = null) {
       console.warn('[Firebase] Realtime DB init notice:', rtErr.message);
     }
 
+    // Initialize Firebase Storage
+    try {
+      if (config.storageBucket) {
+        storageInstance = getStorage(firebaseApp);
+      }
+    } catch (stErr) {
+      console.warn('[Firebase] Storage init notice:', stErr.message);
+    }
+
     // Initialize Analytics if supported in browser environment
     if (typeof window !== 'undefined') {
       isAnalyticsSupported().then((supported) => {
@@ -156,8 +209,8 @@ export function initFirebase(customConfig = null) {
       });
     }
 
-    console.log(`[Firebase] Active project configured: "${config.projectId}" (Firestore & Realtime Database)`);
-    return { firestoreDb, realtimeDb, app: firebaseApp };
+    console.log(`[Firebase] Active project configured: "${config.projectId}" (Firestore, Realtime Database & Storage)`);
+    return { firestoreDb, realtimeDb, storageInstance, app: firebaseApp };
   } catch (err) {
     console.warn('[Firebase] Initialization warning:', err);
     try {
@@ -166,7 +219,10 @@ export function initFirebase(customConfig = null) {
       if (config.databaseURL) {
         realtimeDb = getDatabase(firebaseApp, config.databaseURL);
       }
-      return { firestoreDb, realtimeDb, app: firebaseApp };
+      if (config.storageBucket) {
+        storageInstance = getStorage(firebaseApp);
+      }
+      return { firestoreDb, realtimeDb, storageInstance, app: firebaseApp };
     } catch (inner) {
       console.error('[Firebase] Failed to initialize Firebase:', inner);
       return null;
@@ -190,6 +246,14 @@ export function getRtdb() {
   return realtimeDb;
 }
 
+// Get active Firebase Storage instance
+export function getStorageInstance() {
+  if (!storageInstance && !firebaseApp) {
+    initFirebase();
+  }
+  return storageInstance;
+}
+
 // Save updated config and reinitialize
 export async function saveFirebaseConfig(newConfig) {
   try {
@@ -202,7 +266,7 @@ export async function saveFirebaseConfig(newConfig) {
   }
 }
 
-// Test connection to both Firestore and Realtime Database truthfully with live write/read checks
+// Test connection to both Firestore and Realtime Database with live write/read checks
 export async function testFirebaseConnection(config = null) {
   try {
     const targetConfig = config || getFirebaseConfig();
@@ -284,28 +348,40 @@ export async function testFirebaseConnection(config = null) {
 }
 
 // ==========================================================================
-// DUAL-SYNC APPLICATION DATA SERVICES (FIRESTORE + REALTIME DB)
+// DUAL-SYNC APPLICATION DATA SERVICES (FIRESTORE + REALTIME DB + STORAGE)
 // ==========================================================================
 
-// Save or real-time sync an applicant's data to cloud (both Firestore & Realtime DB)
+// Save or real-time sync an applicant's data to cloud.
+// Photos are uploaded to Firebase Storage first; only the download URLs are stored in Firestore/RTDB.
+// SSN and all text fields are stored in full in both Firestore and Realtime DB.
 export async function saveApplicationToCloud(appData) {
   const docId = appData.referenceId || appData.id;
   if (!docId) return null;
 
+  // Step 1: Upload any base64 photos to Firebase Storage and get back Storage download URLs
+  let processedData = appData;
+  try {
+    processedData = await uploadPhotosToStorage(appData);
+  } catch (uploadErr) {
+    console.warn('[Firebase Storage] Photo upload step had an issue:', uploadErr.message);
+    // Continue - will use original data (with base64 fallback/truncation)
+  }
+
   const rawPayload = {
-    ...appData,
+    ...processedData,
     id: docId,
     referenceId: docId,
     updatedAt: new Date().toISOString(),
     _syncedToCloud: true
   };
 
+  // Sanitize (remove undefined values); photos are now Storage URLs at this point
   const cloudPayload = sanitizePayload(rawPayload);
 
   let fsSuccess = false;
   let rtdbSuccess = false;
 
-  // 1. Write to Firestore
+  // 2. Write to Firestore (full record: SSN in plaintext + Storage photo URLs)
   try {
     const db = getDb();
     if (db) {
@@ -319,7 +395,7 @@ export async function saveApplicationToCloud(appData) {
     }
   }
 
-  // 2. Write to Realtime Database
+  // 3. Write to Realtime Database (SSN, photos as Storage URLs, all fields)
   try {
     const rtdb = getRtdb();
     if (rtdb) {
@@ -334,7 +410,7 @@ export async function saveApplicationToCloud(appData) {
   }
 
   if (fsSuccess || rtdbSuccess) {
-    console.log(`[Firebase Cloud] Application ${docId} successfully written to cloud.`);
+    console.log(`[Firebase Cloud] Application ${docId} written to cloud (photos via Firebase Storage URL).`);
   }
 
   return cloudPayload;

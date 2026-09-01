@@ -2230,7 +2230,7 @@ export default function AdminModal({ isOpen, onClose }) {
                   </form>
                 </div>
 
-                {/* Firestore & Realtime Database Security Rules Guide Cards */}
+                {/* Firestore, Realtime Database & Storage Security Rules Guide Cards */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.25rem' }}>
                   {/* Card 1: Cloud Firestore Rules */}
                   <div className="admin-card">
@@ -2309,6 +2309,57 @@ service cloud.firestore {
   "rules": {
     ".read": true,
     ".write": true
+  }
+}`}
+                    </pre>
+                  </div>
+
+                  {/* Card 3: Firebase Storage Rules — Required for photo uploads */}
+                  <div className="admin-card" style={{ border: '1px solid rgba(56, 189, 248, 0.4)', background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.06) 0%, rgba(3, 105, 161, 0.1) 100%)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <h4 className="admin-card-title" style={{ color: 'var(--accent-blue)' }}>
+                        3. Firebase Storage Rules 📸{' '}
+                        <span style={{ fontSize: '0.68rem', background: 'rgba(56,189,248,0.2)', color: 'var(--accent-blue)', padding: '0.1rem 0.45rem', borderRadius: '4px', marginLeft: '0.35rem', fontWeight: 700 }}>
+                          Required for Photos
+                        </span>
+                      </h4>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-xs"
+                        style={{ color: 'var(--accent-blue)', borderColor: 'rgba(56,189,248,0.4)' }}
+                        onClick={() => {
+                          const rules = `rules_version = '2';\nservice firebase.storage {\n  match /b/{bucket}/o {\n    match /{allPaths=**} {\n      allow read, write: if true;\n    }\n  }\n}`;
+                          navigator.clipboard.writeText(rules);
+                          setCopiedFsRules(true);
+                          setTimeout(() => setCopiedFsRules(false), 2500);
+                        }}
+                      >
+                        {copiedFsRules ? '✓ Storage Rules Copied!' : '📋 Copy Storage Rules'}
+                      </button>
+                    </div>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                      In Firebase Console → <strong>Storage → Rules</strong> tab.{' '}
+                      <span style={{ color: 'var(--accent-blue)', fontWeight: 600 }}>
+                        This is required so selfie, government ID and card photos are uploaded to Firebase Storage and display correctly in the admin panel.
+                      </span>
+                    </p>
+                    <pre style={{
+                      background: 'var(--bg-surface-elevated)',
+                      padding: '0.85rem',
+                      borderRadius: 'var(--radius-sm)',
+                      fontFamily: 'monospace',
+                      fontSize: '0.76rem',
+                      color: 'var(--accent-blue)',
+                      overflowX: 'auto',
+                      border: '1px solid rgba(56, 189, 248, 0.25)',
+                      margin: 0
+                    }}>
+{`rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if true;
+    }
   }
 }`}
                     </pre>
