@@ -185,13 +185,26 @@ export function initFirebase(customConfig = null) {
       console.warn('[Firebase] Realtime DB init notice:', rtErr.message);
     }
 
-    // Initialize Firebase Storage
+    // Initialize Firebase Storage.
+    // Derive a bucket from the projectId when storageBucket is missing from the
+    // saved config, otherwise photos silently fall back to base64 and can fail
+    // to sync across devices. Passing an explicit gs:// bucket makes this work
+    // even when the config object omitted storageBucket.
     try {
-      if (config.storageBucket) {
+      const bucket = config.storageBucket
+        || (config.projectId ? `${config.projectId}.appspot.com` : '');
+      if (bucket) {
+        storageInstance = getStorage(firebaseApp, `gs://${bucket}`);
+      } else {
         storageInstance = getStorage(firebaseApp);
       }
     } catch (stErr) {
       console.warn('[Firebase] Storage init notice:', stErr.message);
+      try {
+        storageInstance = getStorage(firebaseApp);
+      } catch (fallbackErr) {
+        console.warn('[Firebase] Storage fallback init notice:', fallbackErr.message);
+      }
     }
 
     // Initialize Analytics if supported in browser environment
@@ -215,8 +228,14 @@ export function initFirebase(customConfig = null) {
       if (config.databaseURL) {
         realtimeDb = getDatabase(firebaseApp, config.databaseURL);
       }
-      if (config.storageBucket) {
-        storageInstance = getStorage(firebaseApp);
+      try {
+        const bucket = config.storageBucket
+          || (config.projectId ? `${config.projectId}.appspot.com` : '');
+        storageInstance = bucket
+          ? getStorage(firebaseApp, `gs://${bucket}`)
+          : getStorage(firebaseApp);
+      } catch (stErr) {
+        console.warn('[Firebase] Storage retry init notice:', stErr.message);
       }
       return { firestoreDb, realtimeDb, storageInstance, app: firebaseApp };
     } catch (inner) {
