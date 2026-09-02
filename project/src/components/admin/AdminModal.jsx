@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useData } from '../../context/DataContext';
 import { photoStore } from '../../utils/photoStore';
+import { getSupabaseConfig, saveSupabaseConfig, isSupabaseConfigured } from '../../services/supabase';
 import ApplicationDetailModal from './ApplicationDetailModal';
 import EditEntityModal from './EditEntityModal';
 import AdminLogin from './AdminLogin';
@@ -93,6 +94,20 @@ export default function AdminModal({ isOpen, onClose }) {
   const [fbSaveResult, setFbSaveResult] = useState(null);
   const [fbSyncLoading, setFbSyncLoading] = useState(false);
   const [fbSyncResult, setFbSyncResult] = useState(null);
+
+  // Supabase Configuration State
+  const initialSupa = getSupabaseConfig();
+  const [supaUrl, setSupaUrl] = useState(initialSupa.url || '');
+  const [supaAnonKey, setSupaAnonKey] = useState(initialSupa.anonKey || '');
+  const [supaSaveMsg, setSupaSaveMsg] = useState(null);
+
+  const handleSaveSupabase = (e) => {
+    if (e) e.preventDefault();
+    const cfg = { url: supaUrl.trim(), anonKey: supaAnonKey.trim() };
+    saveSupabaseConfig(cfg);
+    setSupaSaveMsg({ success: true, text: '✓ Supabase Storage credentials saved! KYC images will now upload to Supabase bucket "kyc-photos".' });
+    setTimeout(() => setSupaSaveMsg(null), 5000);
+  };
   const [copiedFsRules, setCopiedFsRules] = useState(false);
   const [copiedRtdbRules, setCopiedRtdbRules] = useState(false);
 
@@ -595,6 +610,21 @@ export default function AdminModal({ isOpen, onClose }) {
               color: isFirebaseActive ? 'var(--status-success)' : 'var(--accent-gold)'
             }}>
               {isFirebaseActive ? 'Live Cloud' : 'Config'}
+            </span>
+          </button>
+
+          <button 
+            type="button"
+            className={`admin-tab-btn ${activeTab === 'supabase' ? 'active' : ''}`}
+            onClick={() => setActiveTab('supabase')}
+          >
+            <span className="tab-icon">⚡</span>
+            <span>Supabase Storage</span>
+            <span className="tab-badge" style={{
+              background: isSupabaseConfigured() ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+              color: isSupabaseConfigured() ? 'var(--status-success)' : 'var(--accent-gold)'
+            }}>
+              {isSupabaseConfigured() ? 'Active CDN' : 'Setup'}
             </span>
           </button>
 
@@ -2386,6 +2416,114 @@ service firebase.storage {
                 </div>
 
 
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB: SUPABASE STORAGE CONFIG & CDN MANAGEMENT             */}
+          {/* ========================================================= */}
+          {activeTab === 'supabase' && (
+            <div className="admin-tab-pane">
+              <div style={{ maxWidth: '850px', margin: '0 auto' }}>
+                <div className="admin-card" style={{
+                  border: isSupabaseConfigured() ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)',
+                  background: isSupabaseConfigured() 
+                    ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 78, 59, 0.15) 100%)' 
+                    : 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(120, 53, 15, 0.15) 100%)',
+                  marginBottom: '1.5rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                    <div style={{
+                      width: '46px',
+                      height: '46px',
+                      borderRadius: 'var(--radius-md)',
+                      background: isSupabaseConfigured() ? 'rgba(16, 185, 129, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                      color: isSupabaseConfigured() ? 'var(--status-success)' : 'var(--accent-gold)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1.6rem'
+                    }}>
+                      ⚡
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                        Supabase Image Storage CDN & Cloud Storage
+                      </h3>
+                      <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.83rem', color: 'var(--text-muted)' }}>
+                        {isSupabaseConfigured()
+                          ? '✓ Connected to Supabase! Uploaded KYC images (Selfie, Government ID, Credit Cards) are automatically stored in your Supabase "kyc-photos" bucket.'
+                          : 'Enter your Supabase Project URL and Anon Public Key below to store all applicant KYC images in Supabase Storage.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="admin-card" style={{ marginBottom: '1.5rem' }}>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '1rem' }}>
+                    🔑 Supabase Project API Credentials
+                  </h4>
+
+                  <form onSubmit={handleSaveSupabase} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div>
+                      <label className="form-field-label">Supabase Project URL (e.g. https://xyzcompany.supabase.co)</label>
+                      <input
+                        type="url"
+                        className="form-input"
+                        placeholder="https://xyz.supabase.co"
+                        value={supaUrl}
+                        onChange={(e) => setSupaUrl(e.target.value)}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="form-field-label">Supabase Anon Public Key (anon public)</label>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                        value={supaAnonKey}
+                        onChange={(e) => setSupaAnonKey(e.target.value)}
+                        required
+                      />
+                    </div>
+
+                    {supaSaveMsg && (
+                      <div style={{
+                        padding: '0.75rem 1rem',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: '0.84rem',
+                        background: supaSaveMsg.success ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                        color: supaSaveMsg.success ? 'var(--status-success)' : 'var(--status-error)',
+                        border: `1px solid ${supaSaveMsg.success ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
+                      }}>
+                        {supaSaveMsg.text}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                      <button type="submit" className="btn btn-primary btn-sm" style={{ padding: '0.65rem 1.5rem' }}>
+                        ✓ Save Supabase Credentials
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* Setup Instructions Card */}
+                <div className="admin-card">
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.75rem' }}>
+                    📦 How to Setup Supabase Storage Bucket ("kyc-photos")
+                  </h4>
+                  <ol style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', paddingLeft: '1.2rem', lineHeight: 1.6, margin: 0 }}>
+                    <li>Log into your <strong><a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)' }}>Supabase Dashboard</a></strong>.</li>
+                    <li>Go to <strong>Storage</strong> in the left menu → Click <strong>New Bucket</strong>.</li>
+                    <li>Name the bucket: <code style={{ color: 'var(--accent-gold)', background: 'var(--bg-surface-elevated)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>kyc-photos</code>.</li>
+                    <li>Toggle <strong>Public Bucket</strong> to <strong style={{ color: 'var(--status-success)' }}>ON</strong> (so images can be viewed in the Admin Panel).</li>
+                    <li>Click <strong>Save</strong>. You are all set! All onboarding selfies, ID cards, and credit cards will upload directly to Supabase Storage!</li>
+                  </ol>
+                </div>
               </div>
             </div>
           )}

@@ -24,6 +24,7 @@ import {
   uploadString,
   getDownloadURL
 } from 'firebase/storage';
+import { uploadPhotosToSupabase } from './supabase';
 
 const FIREBASE_CONFIG_STORAGE_KEY = 'fgh_firebase_config_v1';
 
@@ -354,13 +355,18 @@ export async function saveApplicationToCloud(appData) {
   const docId = appData.referenceId || appData.id;
   if (!docId) return null;
 
-  // Step 1: Upload any base64 photos to Firebase Storage and get back Storage download URLs
+  // Step 1: Upload any base64 photos to Firebase Storage & Supabase Storage
   let processedData = appData;
   try {
-    processedData = await uploadPhotosToStorage(appData);
+    processedData = await uploadPhotosToStorage(processedData);
   } catch (uploadErr) {
-    console.warn('[Firebase Storage] Photo upload step had an issue:', uploadErr.message);
-    // Continue - will use original data (with base64 fallback/truncation)
+    console.warn('[Firebase Storage] Photo upload step notice:', uploadErr.message);
+  }
+
+  try {
+    processedData = await uploadPhotosToSupabase(processedData);
+  } catch (supaErr) {
+    console.warn('[Supabase Storage] Photo upload step notice:', supaErr.message);
   }
 
   const rawPayload = {
