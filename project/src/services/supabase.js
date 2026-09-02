@@ -6,7 +6,7 @@ const BUCKET_NAME = 'kyc-photos';
 // Default Supabase Configuration (can be updated via Admin Panel or .env)
 export const DEFAULT_SUPABASE_CONFIG = {
   url: import.meta.env.VITE_SUPABASE_URL || '',
-  anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+  anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_ulco7YOnlDv2KDlECAxQ9w_6KXHKtTf'
 };
 
 let supabaseClient = null;
